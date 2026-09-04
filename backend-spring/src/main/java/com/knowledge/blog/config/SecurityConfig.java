@@ -45,7 +45,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/posts/**", "/api/categories/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/rag/query").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/rag/evaluation/latest").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/rag/evaluation/latest").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/categories/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/posts/*/reindex").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/posts/**").hasRole("ADMIN")

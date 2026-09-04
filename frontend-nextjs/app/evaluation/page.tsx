@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
-import { API_URL } from '@/lib/knowledge-api';
+import { useRouter } from 'next/navigation';
+import { authFetch, getUser } from '@/lib/auth-client';
 
 type Summary = Record<string, number>;
 type Profile = { summary: Summary; cases: { id: string; query: string; passed?: boolean; latency_ms: number }[] };
@@ -21,18 +22,34 @@ type Report = {
 const percent = (value?: number) => `${((value || 0) * 100).toFixed(1)}%`;
 
 export default function EvaluationPage() {
+  const router = useRouter();
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState('');
+  const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/rag/evaluation/latest`)
+    const user = getUser();
+    if (user?.role !== 'ROLE_ADMIN') {
+      router.replace(user ? '/' : '/auth');
+      return;
+    }
+
+    authFetch('/api/rag/evaluation/latest')
       .then((response) => {
         if (!response.ok) throw new Error();
         return response.json();
       })
-      .then(setReport)
-      .catch(() => setError('평가 결과를 불러오지 못했습니다.'));
-  }, []);
+      .then((data) => {
+        setReport(data);
+        setAuthorized(true);
+      })
+      .catch(() => {
+        setError('평가 결과를 불러오지 못했습니다.');
+        setAuthorized(true);
+      });
+  }, [router]);
+
+  if (!authorized) return null;
 
   return <div className="portal-page"><Header/><main className="portal-main space-y-7">
     <div><span className="mono text-[11px] text-[#06b6d4]">RAG QUALITY LAB</span><h1 className="mt-2 text-3xl font-bold text-[#002045]">Evaluation Dashboard</h1><p className="mt-2 text-sm text-[#545f72]">Golden set 기반 검색·생성 A/B 결과와 실패 회귀 사례를 확인합니다.</p></div>
