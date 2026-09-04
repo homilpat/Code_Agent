@@ -1,0 +1,2644 @@
+{
+  "status": "complete",
+  "created_at": "2026-09-03T06:17:03+00:00",
+  "dataset_version": "1.0",
+  "dataset_cases": 50,
+  "retrieval": {
+    "profiles": {
+      "dense": {
+        "summary": {
+          "cases": 50,
+          "hit_at_k": 0.9,
+          "recall_at_k": 0.9,
+          "mrr": 0.89,
+          "latency_ms": 31.6
+        },
+        "cases": [
+          {
+            "id": "ai-001",
+            "query": "인공지능과 머신러닝, 딥러닝의 포함 관계를 설명해줘",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 547,
+            "source_ids": [
+              3,
+              4,
+              9,
+              12
+            ]
+          },
+          {
+            "id": "ai-002",
+            "query": "머신러닝은 사람이 규칙을 직접 입력하는 방식과 어떻게 다른가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 20,
+            "source_ids": [
+              3,
+              4,
+              8,
+              15
+            ]
+          },
+          {
+            "id": "ai-003",
+            "query": "딥러닝은 머신러닝 안에서 어떤 위치인가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 20,
+            "source_ids": [
+              3,
+              4,
+              5,
+              9
+            ]
+          },
+          {
+            "id": "ai-004",
+            "query": "머신러닝에서 일반화가 의미하는 것은 무엇인가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 76,
+            "source_ids": [
+              3,
+              4,
+              13,
+              15
+            ]
+          },
+          {
+            "id": "classic-001",
+            "query": "선형 회귀와 로지스틱 회귀의 핵심 차이는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 22,
+            "source_ids": [
+              14,
+              4,
+              10,
+              6
+            ]
+          },
+          {
+            "id": "classic-002",
+            "query": "SVM은 어떤 기준으로 결정 경계를 선택하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 20,
+            "source_ids": [
+              15,
+              4,
+              14,
+              11
+            ]
+          },
+          {
+            "id": "classic-003",
+            "query": "커널 트릭이 고차원 변환의 연산 부담을 줄이는 원리는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 22,
+            "source_ids": [
+              15,
+              13,
+              7,
+              12
+            ]
+          },
+          {
+            "id": "classic-004",
+            "query": "KNN은 새로운 입력을 어떻게 분류하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 29,
+            "source_ids": [
+              4,
+              12,
+              7,
+              13
+            ]
+          },
+          {
+            "id": "perceptron-001",
+            "query": "퍼셉트론에서 가중치는 어떤 역할을 하나?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 22,
+            "source_ids": [
+              8,
+              5,
+              4,
+              6
+            ]
+          },
+          {
+            "id": "perceptron-002",
+            "query": "퍼셉트론의 편향은 무엇을 조절하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 24,
+            "source_ids": [
+              5,
+              4,
+              8,
+              12
+            ]
+          },
+          {
+            "id": "perceptron-003",
+            "query": "활성화 함수가 신경망에 필요한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 20,
+            "source_ids": [
+              5,
+              11,
+              6,
+              9
+            ]
+          },
+          {
+            "id": "perceptron-004",
+            "query": "단층 퍼셉트론이 XOR 문제를 풀 수 없는 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 29,
+            "source_ids": [
+              8,
+              9,
+              5,
+              13
+            ]
+          },
+          {
+            "id": "backprop-001",
+            "query": "오차 역전파는 무엇을 거꾸로 전달하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              6,
+              9,
+              10,
+              11
+            ]
+          },
+          {
+            "id": "backprop-002",
+            "query": "역전파에서 연쇄 법칙은 어떻게 사용되는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              9,
+              6,
+              11,
+              10
+            ]
+          },
+          {
+            "id": "backprop-003",
+            "query": "경사하강법에서 기울기는 어떤 방향 정보를 주는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 24,
+            "source_ids": [
+              6,
+              8,
+              9,
+              11
+            ]
+          },
+          {
+            "id": "backprop-004",
+            "query": "역전파를 사용하지 않는 학습 방식에는 무엇이 있는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 31,
+            "source_ids": [
+              6,
+              12,
+              7,
+              8
+            ]
+          },
+          {
+            "id": "mlp-001",
+            "query": "다층 퍼셉트론의 은닉층이 XOR 해결에 기여하는 방식은?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 55,
+            "source_ids": [
+              9,
+              8,
+              7,
+              4
+            ]
+          },
+          {
+            "id": "mlp-002",
+            "query": "시그모이드 함수가 계단 함수보다 역전파에 적합했던 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 31,
+            "source_ids": [
+              9,
+              14,
+              4,
+              5
+            ]
+          },
+          {
+            "id": "mlp-003",
+            "query": "깊은 시그모이드 신경망에서 기울기가 사라지는 계산 원리는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              11,
+              9,
+              14,
+              5
+            ]
+          },
+          {
+            "id": "mlp-004",
+            "query": "기울기 소실이 앞쪽 층의 학습에 미치는 영향은?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 24,
+            "source_ids": [
+              9,
+              12,
+              11,
+              8
+            ]
+          },
+          {
+            "id": "spatial-001",
+            "query": "ReLU가 시그모이드의 기울기 소실을 완화하는 원리는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 19,
+            "source_ids": [
+              11,
+              9,
+              14,
+              8
+            ]
+          },
+          {
+            "id": "spatial-002",
+            "query": "CNN의 파라미터 공유가 주는 효과는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 0.5,
+            "latency_ms": 19,
+            "source_ids": [
+              12,
+              11,
+              13,
+              7
+            ]
+          },
+          {
+            "id": "spatial-003",
+            "query": "최대 풀링은 특징 맵을 어떻게 축소하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 17,
+            "source_ids": [
+              11,
+              12,
+              15,
+              7
+            ]
+          },
+          {
+            "id": "spatial-004",
+            "query": "LSTM의 셀 상태와 게이트는 장기 기억에 어떻게 기여하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 19,
+            "source_ids": [
+              11
+            ]
+          },
+          {
+            "id": "generative-001",
+            "query": "VAE의 잠재 공간은 데이터를 어떤 분포로 표현하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 18,
+            "source_ids": [
+              10,
+              15,
+              9,
+              12
+            ]
+          },
+          {
+            "id": "generative-002",
+            "query": "VAE에서 재매개변수화 트릭이 필요한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 18,
+            "source_ids": [
+              10,
+              15,
+              14,
+              6
+            ]
+          },
+          {
+            "id": "generative-003",
+            "query": "GAN의 생성자와 판별자는 각각 어떤 목표를 가지는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 17,
+            "source_ids": [
+              10,
+              3,
+              7,
+              5
+            ]
+          },
+          {
+            "id": "generative-004",
+            "query": "확산 모델의 정방향과 역방향 과정은 어떻게 다른가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 19,
+            "source_ids": [
+              10,
+              6,
+              9,
+              8
+            ]
+          },
+          {
+            "id": "transformer-001",
+            "query": "트랜스포머의 Q, K, V는 Self-Attention에서 어떻게 쓰이는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 17,
+            "source_ids": [
+              12,
+              7,
+              6,
+              4
+            ]
+          },
+          {
+            "id": "transformer-002",
+            "query": "트랜스포머가 RNN보다 병렬 처리에 유리한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 19,
+            "source_ids": [
+              7,
+              12,
+              13,
+              11
+            ]
+          },
+          {
+            "id": "transformer-003",
+            "query": "Scaled Dot-Product Attention에서 내적값을 스케일링하는 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 20,
+            "source_ids": [
+              12,
+              8,
+              11,
+              7
+            ]
+          },
+          {
+            "id": "transformer-004",
+            "query": "Vision Transformer는 이미지를 어떻게 시퀀스로 바꾸는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 19,
+            "source_ids": [
+              12,
+              7,
+              15,
+              13
+            ]
+          },
+          {
+            "id": "modern-001",
+            "query": "대조 학습에서 positive pair와 negative pair는 어떻게 다뤄지는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 24,
+            "source_ids": [
+              12,
+              7,
+              10,
+              6
+            ]
+          },
+          {
+            "id": "modern-002",
+            "query": "MobileNetV2가 엣지 장치에 적합한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 18,
+            "source_ids": [
+              7,
+              13,
+              15
+            ]
+          },
+          {
+            "id": "modern-003",
+            "query": "Late Fusion은 서로 다른 센서 데이터를 언제 결합하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 17,
+            "source_ids": [
+              7,
+              13,
+              8,
+              11
+            ]
+          },
+          {
+            "id": "modern-004",
+            "query": "Late Fusion이 센서 노이즈에 강한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 16,
+            "source_ids": [
+              13,
+              7,
+              10,
+              8
+            ]
+          },
+          {
+            "id": "graph-001",
+            "query": "GraphRAG는 일반 벡터 검색과 무엇이 다른가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 17,
+            "source_ids": [
+              13,
+              7,
+              4,
+              11
+            ]
+          },
+          {
+            "id": "graph-002",
+            "query": "GNN의 메시지 패싱은 노드 정보를 어떻게 갱신하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 16,
+            "source_ids": [
+              13,
+              10,
+              11,
+              7
+            ]
+          },
+          {
+            "id": "graph-003",
+            "query": "GraphRAG의 다중 홉 탐색이 필요한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 17,
+            "source_ids": [
+              13,
+              7,
+              12,
+              9
+            ]
+          },
+          {
+            "id": "graph-004",
+            "query": "트랜스포머와 지식 그래프를 결합한 설계가 가능한가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 18,
+            "source_ids": [
+              13,
+              7,
+              12,
+              11
+            ]
+          },
+          {
+            "id": "unknown-001",
+            "query": "양자 오류 정정에 surface code를 적용하는 절차는?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 16,
+            "source_ids": [
+              10,
+              6,
+              9,
+              12
+            ]
+          },
+          {
+            "id": "unknown-002",
+            "query": "쿠버네티스에서 etcd 장애를 복구하는 명령어를 알려줘",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 19,
+            "source_ids": []
+          },
+          {
+            "id": "unknown-003",
+            "query": "반도체 식각 장비의 RF reflected power 알람 원인은?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 17,
+            "source_ids": [
+              9,
+              11,
+              8,
+              5
+            ]
+          },
+          {
+            "id": "unknown-004",
+            "query": "Rust borrow checker의 lifetime elision 규칙은?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 17,
+            "source_ids": []
+          },
+          {
+            "id": "unknown-005",
+            "query": "Redis cluster의 hash slot 재분배 방법은?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 18,
+            "source_ids": [
+              10,
+              11,
+              4,
+              14
+            ]
+          },
+          {
+            "id": "policy-001",
+            "query": "나는 새로운 알고리즘을 만들고 싶어. 괜찮을까?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 17,
+            "source_ids": [
+              8,
+              3,
+              10,
+              12
+            ]
+          },
+          {
+            "id": "policy-002",
+            "query": "이거 왜 그래?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 0,
+            "source_ids": []
+          },
+          {
+            "id": "policy-003",
+            "query": "새 모델을 설계해줘",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 18,
+            "source_ids": [
+              10,
+              12,
+              9,
+              8
+            ]
+          },
+          {
+            "id": "policy-004",
+            "query": "안녕하세요",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 0,
+            "source_ids": []
+          },
+          {
+            "id": "policy-005",
+            "query": "고마워",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 0,
+            "source_ids": []
+          }
+        ]
+      },
+      "hybrid": {
+        "summary": {
+          "cases": 50,
+          "hit_at_k": 0.86,
+          "recall_at_k": 0.86,
+          "mrr": 0.85,
+          "latency_ms": 25.5
+        },
+        "cases": [
+          {
+            "id": "ai-001",
+            "query": "인공지능과 머신러닝, 딥러닝의 포함 관계를 설명해줘",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              3,
+              4,
+              5,
+              7
+            ]
+          },
+          {
+            "id": "ai-002",
+            "query": "머신러닝은 사람이 규칙을 직접 입력하는 방식과 어떻게 다른가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              3,
+              8,
+              4,
+              15
+            ]
+          },
+          {
+            "id": "ai-003",
+            "query": "딥러닝은 머신러닝 안에서 어떤 위치인가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 28,
+            "source_ids": [
+              3,
+              9,
+              4,
+              15
+            ]
+          },
+          {
+            "id": "ai-004",
+            "query": "머신러닝에서 일반화가 의미하는 것은 무엇인가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              3,
+              15,
+              4,
+              8
+            ]
+          },
+          {
+            "id": "classic-001",
+            "query": "선형 회귀와 로지스틱 회귀의 핵심 차이는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 31,
+            "source_ids": [
+              14,
+              4,
+              8,
+              15
+            ]
+          },
+          {
+            "id": "classic-002",
+            "query": "SVM은 어떤 기준으로 결정 경계를 선택하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              15,
+              14,
+              4,
+              11
+            ]
+          },
+          {
+            "id": "classic-003",
+            "query": "커널 트릭이 고차원 변환의 연산 부담을 줄이는 원리는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              15,
+              13,
+              9,
+              12
+            ]
+          },
+          {
+            "id": "classic-004",
+            "query": "KNN은 새로운 입력을 어떻게 분류하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 29,
+            "source_ids": [
+              4,
+              11,
+              15,
+              12
+            ]
+          },
+          {
+            "id": "perceptron-001",
+            "query": "퍼셉트론에서 가중치는 어떤 역할을 하나?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              5,
+              6,
+              8,
+              9
+            ]
+          },
+          {
+            "id": "perceptron-002",
+            "query": "퍼셉트론의 편향은 무엇을 조절하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              5,
+              4,
+              8,
+              9
+            ]
+          },
+          {
+            "id": "perceptron-003",
+            "query": "활성화 함수가 신경망에 필요한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 30,
+            "source_ids": [
+              5,
+              9,
+              11,
+              6
+            ]
+          },
+          {
+            "id": "perceptron-004",
+            "query": "단층 퍼셉트론이 XOR 문제를 풀 수 없는 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              8,
+              9,
+              4,
+              5
+            ]
+          },
+          {
+            "id": "backprop-001",
+            "query": "오차 역전파는 무엇을 거꾸로 전달하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              6,
+              9,
+              10,
+              8
+            ]
+          },
+          {
+            "id": "backprop-002",
+            "query": "역전파에서 연쇄 법칙은 어떻게 사용되는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              9,
+              11,
+              10,
+              6
+            ]
+          },
+          {
+            "id": "backprop-003",
+            "query": "경사하강법에서 기울기는 어떤 방향 정보를 주는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 25,
+            "source_ids": [
+              6,
+              8,
+              9,
+              11
+            ]
+          },
+          {
+            "id": "backprop-004",
+            "query": "역전파를 사용하지 않는 학습 방식에는 무엇이 있는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 25,
+            "source_ids": [
+              6,
+              8,
+              4,
+              7
+            ]
+          },
+          {
+            "id": "mlp-001",
+            "query": "다층 퍼셉트론의 은닉층이 XOR 해결에 기여하는 방식은?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 28,
+            "source_ids": [
+              9,
+              8,
+              5,
+              7
+            ]
+          },
+          {
+            "id": "mlp-002",
+            "query": "시그모이드 함수가 계단 함수보다 역전파에 적합했던 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              9,
+              4,
+              14,
+              5
+            ]
+          },
+          {
+            "id": "mlp-003",
+            "query": "깊은 시그모이드 신경망에서 기울기가 사라지는 계산 원리는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              11,
+              9,
+              8,
+              14
+            ]
+          },
+          {
+            "id": "mlp-004",
+            "query": "기울기 소실이 앞쪽 층의 학습에 미치는 영향은?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              9,
+              11,
+              8,
+              6
+            ]
+          },
+          {
+            "id": "spatial-001",
+            "query": "ReLU가 시그모이드의 기울기 소실을 완화하는 원리는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              11,
+              9,
+              8,
+              14
+            ]
+          },
+          {
+            "id": "spatial-002",
+            "query": "CNN의 파라미터 공유가 주는 효과는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 0.5,
+            "latency_ms": 26,
+            "source_ids": [
+              12,
+              11,
+              7,
+              15
+            ]
+          },
+          {
+            "id": "spatial-003",
+            "query": "최대 풀링은 특징 맵을 어떻게 축소하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              11,
+              10,
+              13,
+              15
+            ]
+          },
+          {
+            "id": "spatial-004",
+            "query": "LSTM의 셀 상태와 게이트는 장기 기억에 어떻게 기여하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 28,
+            "source_ids": [
+              11,
+              9,
+              10,
+              15
+            ]
+          },
+          {
+            "id": "generative-001",
+            "query": "VAE의 잠재 공간은 데이터를 어떤 분포로 표현하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              10,
+              9,
+              4,
+              15
+            ]
+          },
+          {
+            "id": "generative-002",
+            "query": "VAE에서 재매개변수화 트릭이 필요한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              10,
+              15,
+              7,
+              12
+            ]
+          },
+          {
+            "id": "generative-003",
+            "query": "GAN의 생성자와 판별자는 각각 어떤 목표를 가지는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              10,
+              3,
+              7,
+              15
+            ]
+          },
+          {
+            "id": "generative-004",
+            "query": "확산 모델의 정방향과 역방향 과정은 어떻게 다른가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 28,
+            "source_ids": [
+              10,
+              8,
+              9,
+              12
+            ]
+          },
+          {
+            "id": "transformer-001",
+            "query": "트랜스포머의 Q, K, V는 Self-Attention에서 어떻게 쓰이는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              12,
+              7,
+              4,
+              15
+            ]
+          },
+          {
+            "id": "transformer-002",
+            "query": "트랜스포머가 RNN보다 병렬 처리에 유리한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              7,
+              12,
+              11,
+              14
+            ]
+          },
+          {
+            "id": "transformer-003",
+            "query": "Scaled Dot-Product Attention에서 내적값을 스케일링하는 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              12,
+              7,
+              11,
+              10
+            ]
+          },
+          {
+            "id": "transformer-004",
+            "query": "Vision Transformer는 이미지를 어떻게 시퀀스로 바꾸는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              12,
+              7,
+              10,
+              11
+            ]
+          },
+          {
+            "id": "modern-001",
+            "query": "대조 학습에서 positive pair와 negative pair는 어떻게 다뤄지는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              7,
+              12,
+              9,
+              14
+            ]
+          },
+          {
+            "id": "modern-002",
+            "query": "MobileNetV2가 엣지 장치에 적합한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 26,
+            "source_ids": [
+              7,
+              13,
+              15,
+              5
+            ]
+          },
+          {
+            "id": "modern-003",
+            "query": "Late Fusion은 서로 다른 센서 데이터를 언제 결합하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 31,
+            "source_ids": [
+              7,
+              13,
+              11,
+              9
+            ]
+          },
+          {
+            "id": "modern-004",
+            "query": "Late Fusion이 센서 노이즈에 강한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 31,
+            "source_ids": [
+              13,
+              7,
+              10,
+              5
+            ]
+          },
+          {
+            "id": "graph-001",
+            "query": "GraphRAG는 일반 벡터 검색과 무엇이 다른가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 30,
+            "source_ids": [
+              13,
+              12,
+              7,
+              15
+            ]
+          },
+          {
+            "id": "graph-002",
+            "query": "GNN의 메시지 패싱은 노드 정보를 어떻게 갱신하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 31,
+            "source_ids": [
+              13,
+              11,
+              7,
+              5
+            ]
+          },
+          {
+            "id": "graph-003",
+            "query": "GraphRAG의 다중 홉 탐색이 필요한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 29,
+            "source_ids": [
+              13,
+              7,
+              12,
+              9
+            ]
+          },
+          {
+            "id": "graph-004",
+            "query": "트랜스포머와 지식 그래프를 결합한 설계가 가능한가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 27,
+            "source_ids": [
+              13,
+              12,
+              7,
+              11
+            ]
+          },
+          {
+            "id": "unknown-001",
+            "query": "양자 오류 정정에 surface code를 적용하는 절차는?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 28,
+            "source_ids": [
+              9,
+              8,
+              10,
+              12
+            ]
+          },
+          {
+            "id": "unknown-002",
+            "query": "쿠버네티스에서 etcd 장애를 복구하는 명령어를 알려줘",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 28,
+            "source_ids": [
+              6,
+              14,
+              12,
+              7
+            ]
+          },
+          {
+            "id": "unknown-003",
+            "query": "반도체 식각 장비의 RF reflected power 알람 원인은?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 27,
+            "source_ids": [
+              9,
+              8,
+              11,
+              5
+            ]
+          },
+          {
+            "id": "unknown-004",
+            "query": "Rust borrow checker의 lifetime elision 규칙은?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 25,
+            "source_ids": [
+              9,
+              3,
+              8
+            ]
+          },
+          {
+            "id": "unknown-005",
+            "query": "Redis cluster의 hash slot 재분배 방법은?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 26,
+            "source_ids": [
+              11,
+              10,
+              9,
+              4
+            ]
+          },
+          {
+            "id": "policy-001",
+            "query": "나는 새로운 알고리즘을 만들고 싶어. 괜찮을까?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 26,
+            "source_ids": [
+              6,
+              4,
+              15,
+              7
+            ]
+          },
+          {
+            "id": "policy-002",
+            "query": "이거 왜 그래?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 0,
+            "source_ids": []
+          },
+          {
+            "id": "policy-003",
+            "query": "새 모델을 설계해줘",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 25,
+            "source_ids": [
+              10,
+              12,
+              13,
+              9
+            ]
+          },
+          {
+            "id": "policy-004",
+            "query": "안녕하세요",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 0,
+            "source_ids": []
+          },
+          {
+            "id": "policy-005",
+            "query": "고마워",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 0,
+            "source_ids": []
+          }
+        ]
+      },
+      "hybrid_rerank": {
+        "summary": {
+          "cases": 50,
+          "hit_at_k": 0.86,
+          "recall_at_k": 0.86,
+          "mrr": 0.84,
+          "latency_ms": 5335.2
+        },
+        "cases": [
+          {
+            "id": "ai-001",
+            "query": "인공지능과 머신러닝, 딥러닝의 포함 관계를 설명해줘",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 10210,
+            "source_ids": [
+              3,
+              4,
+              5,
+              12
+            ]
+          },
+          {
+            "id": "ai-002",
+            "query": "머신러닝은 사람이 규칙을 직접 입력하는 방식과 어떻게 다른가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5181,
+            "source_ids": [
+              3,
+              4,
+              12,
+              15
+            ]
+          },
+          {
+            "id": "ai-003",
+            "query": "딥러닝은 머신러닝 안에서 어떤 위치인가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6787,
+            "source_ids": [
+              3,
+              4,
+              5,
+              11
+            ]
+          },
+          {
+            "id": "ai-004",
+            "query": "머신러닝에서 일반화가 의미하는 것은 무엇인가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5452,
+            "source_ids": [
+              3,
+              4,
+              14,
+              15
+            ]
+          },
+          {
+            "id": "classic-001",
+            "query": "선형 회귀와 로지스틱 회귀의 핵심 차이는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6873,
+            "source_ids": [
+              14,
+              4,
+              6
+            ]
+          },
+          {
+            "id": "classic-002",
+            "query": "SVM은 어떤 기준으로 결정 경계를 선택하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6030,
+            "source_ids": [
+              15,
+              4,
+              3,
+              14
+            ]
+          },
+          {
+            "id": "classic-003",
+            "query": "커널 트릭이 고차원 변환의 연산 부담을 줄이는 원리는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 7531,
+            "source_ids": [
+              15,
+              11,
+              12,
+              7
+            ]
+          },
+          {
+            "id": "classic-004",
+            "query": "KNN은 새로운 입력을 어떻게 분류하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6176,
+            "source_ids": [
+              4,
+              8,
+              15,
+              12
+            ]
+          },
+          {
+            "id": "perceptron-001",
+            "query": "퍼셉트론에서 가중치는 어떤 역할을 하나?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 4933,
+            "source_ids": [
+              5,
+              8,
+              4,
+              9
+            ]
+          },
+          {
+            "id": "perceptron-002",
+            "query": "퍼셉트론의 편향은 무엇을 조절하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 4992,
+            "source_ids": [
+              5,
+              4,
+              9,
+              8
+            ]
+          },
+          {
+            "id": "perceptron-003",
+            "query": "활성화 함수가 신경망에 필요한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 0.5,
+            "latency_ms": 6041,
+            "source_ids": [
+              9,
+              5,
+              11,
+              8
+            ]
+          },
+          {
+            "id": "perceptron-004",
+            "query": "단층 퍼셉트론이 XOR 문제를 풀 수 없는 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 0.5,
+            "latency_ms": 6047,
+            "source_ids": [
+              9,
+              8,
+              5,
+              4
+            ]
+          },
+          {
+            "id": "backprop-001",
+            "query": "오차 역전파는 무엇을 거꾸로 전달하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5617,
+            "source_ids": [
+              6,
+              9,
+              8,
+              10
+            ]
+          },
+          {
+            "id": "backprop-002",
+            "query": "역전파에서 연쇄 법칙은 어떻게 사용되는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6353,
+            "source_ids": [
+              9,
+              11,
+              10,
+              6
+            ]
+          },
+          {
+            "id": "backprop-003",
+            "query": "경사하강법에서 기울기는 어떤 방향 정보를 주는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5987,
+            "source_ids": [
+              6,
+              8,
+              9,
+              11
+            ]
+          },
+          {
+            "id": "backprop-004",
+            "query": "역전파를 사용하지 않는 학습 방식에는 무엇이 있는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5341,
+            "source_ids": [
+              6,
+              11,
+              10,
+              9
+            ]
+          },
+          {
+            "id": "mlp-001",
+            "query": "다층 퍼셉트론의 은닉층이 XOR 해결에 기여하는 방식은?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6395,
+            "source_ids": [
+              9,
+              8,
+              3,
+              5
+            ]
+          },
+          {
+            "id": "mlp-002",
+            "query": "시그모이드 함수가 계단 함수보다 역전파에 적합했던 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6127,
+            "source_ids": [
+              9,
+              4,
+              5,
+              14
+            ]
+          },
+          {
+            "id": "mlp-003",
+            "query": "깊은 시그모이드 신경망에서 기울기가 사라지는 계산 원리는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6546,
+            "source_ids": [
+              11,
+              9,
+              8
+            ]
+          },
+          {
+            "id": "mlp-004",
+            "query": "기울기 소실이 앞쪽 층의 학습에 미치는 영향은?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5984,
+            "source_ids": [
+              9,
+              11
+            ]
+          },
+          {
+            "id": "spatial-001",
+            "query": "ReLU가 시그모이드의 기울기 소실을 완화하는 원리는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6701,
+            "source_ids": [
+              11,
+              9,
+              4,
+              5
+            ]
+          },
+          {
+            "id": "spatial-002",
+            "query": "CNN의 파라미터 공유가 주는 효과는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6155,
+            "source_ids": [
+              11,
+              12,
+              13,
+              15
+            ]
+          },
+          {
+            "id": "spatial-003",
+            "query": "최대 풀링은 특징 맵을 어떻게 축소하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5338,
+            "source_ids": [
+              11,
+              13,
+              15,
+              7
+            ]
+          },
+          {
+            "id": "spatial-004",
+            "query": "LSTM의 셀 상태와 게이트는 장기 기억에 어떻게 기여하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6549,
+            "source_ids": [
+              11,
+              6,
+              13,
+              8
+            ]
+          },
+          {
+            "id": "generative-001",
+            "query": "VAE의 잠재 공간은 데이터를 어떤 분포로 표현하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5956,
+            "source_ids": [
+              10,
+              15,
+              9,
+              13
+            ]
+          },
+          {
+            "id": "generative-002",
+            "query": "VAE에서 재매개변수화 트릭이 필요한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 4799,
+            "source_ids": [
+              10,
+              11,
+              15,
+              6
+            ]
+          },
+          {
+            "id": "generative-003",
+            "query": "GAN의 생성자와 판별자는 각각 어떤 목표를 가지는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6030,
+            "source_ids": [
+              10,
+              3,
+              15,
+              5
+            ]
+          },
+          {
+            "id": "generative-004",
+            "query": "확산 모델의 정방향과 역방향 과정은 어떻게 다른가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6047,
+            "source_ids": [
+              10,
+              9,
+              12,
+              8
+            ]
+          },
+          {
+            "id": "transformer-001",
+            "query": "트랜스포머의 Q, K, V는 Self-Attention에서 어떻게 쓰이는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6270,
+            "source_ids": [
+              12,
+              7
+            ]
+          },
+          {
+            "id": "transformer-002",
+            "query": "트랜스포머가 RNN보다 병렬 처리에 유리한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6704,
+            "source_ids": [
+              7,
+              12,
+              11,
+              14
+            ]
+          },
+          {
+            "id": "transformer-003",
+            "query": "Scaled Dot-Product Attention에서 내적값을 스케일링하는 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6439,
+            "source_ids": [
+              12,
+              7,
+              8,
+              11
+            ]
+          },
+          {
+            "id": "transformer-004",
+            "query": "Vision Transformer는 이미지를 어떻게 시퀀스로 바꾸는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5494,
+            "source_ids": [
+              12,
+              7,
+              11,
+              10
+            ]
+          },
+          {
+            "id": "modern-001",
+            "query": "대조 학습에서 positive pair와 negative pair는 어떻게 다뤄지는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5603,
+            "source_ids": [
+              12,
+              7,
+              8,
+              6
+            ]
+          },
+          {
+            "id": "modern-002",
+            "query": "MobileNetV2가 엣지 장치에 적합한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 3660,
+            "source_ids": [
+              7,
+              13,
+              12,
+              11
+            ]
+          },
+          {
+            "id": "modern-003",
+            "query": "Late Fusion은 서로 다른 센서 데이터를 언제 결합하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5970,
+            "source_ids": [
+              7,
+              13,
+              10,
+              12
+            ]
+          },
+          {
+            "id": "modern-004",
+            "query": "Late Fusion이 센서 노이즈에 강한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 5188,
+            "source_ids": [
+              13,
+              7,
+              5,
+              11
+            ]
+          },
+          {
+            "id": "graph-001",
+            "query": "GraphRAG는 일반 벡터 검색과 무엇이 다른가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6008,
+            "source_ids": [
+              7,
+              13,
+              4,
+              12
+            ]
+          },
+          {
+            "id": "graph-002",
+            "query": "GNN의 메시지 패싱은 노드 정보를 어떻게 갱신하는가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6471,
+            "source_ids": [
+              13,
+              11,
+              12,
+              10
+            ]
+          },
+          {
+            "id": "graph-003",
+            "query": "GraphRAG의 다중 홉 탐색이 필요한 이유는?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6003,
+            "source_ids": [
+              13,
+              7
+            ]
+          },
+          {
+            "id": "graph-004",
+            "query": "트랜스포머와 지식 그래프를 결합한 설계가 가능한가?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 6120,
+            "source_ids": [
+              13,
+              12,
+              7
+            ]
+          },
+          {
+            "id": "unknown-001",
+            "query": "양자 오류 정정에 surface code를 적용하는 절차는?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 4945,
+            "source_ids": [
+              6,
+              9,
+              15,
+              10
+            ]
+          },
+          {
+            "id": "unknown-002",
+            "query": "쿠버네티스에서 etcd 장애를 복구하는 명령어를 알려줘",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 5021,
+            "source_ids": [
+              6,
+              12,
+              11,
+              9
+            ]
+          },
+          {
+            "id": "unknown-003",
+            "query": "반도체 식각 장비의 RF reflected power 알람 원인은?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 1166,
+            "source_ids": [
+              9,
+              11,
+              5,
+              8
+            ]
+          },
+          {
+            "id": "unknown-004",
+            "query": "Rust borrow checker의 lifetime elision 규칙은?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 753,
+            "source_ids": [
+              9,
+              8,
+              3
+            ]
+          },
+          {
+            "id": "unknown-005",
+            "query": "Redis cluster의 hash slot 재분배 방법은?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 2563,
+            "source_ids": [
+              10,
+              9,
+              13,
+              4
+            ]
+          },
+          {
+            "id": "policy-001",
+            "query": "나는 새로운 알고리즘을 만들고 싶어. 괜찮을까?",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 4880,
+            "source_ids": [
+              4,
+              6,
+              7,
+              15
+            ]
+          },
+          {
+            "id": "policy-002",
+            "query": "이거 왜 그래?",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 0,
+            "source_ids": []
+          },
+          {
+            "id": "policy-003",
+            "query": "새 모델을 설계해줘",
+            "hit_at_k": 0.0,
+            "recall_at_k": 0.0,
+            "mrr": 0.0,
+            "latency_ms": 5322,
+            "source_ids": [
+              10,
+              7,
+              12,
+              13
+            ]
+          },
+          {
+            "id": "policy-004",
+            "query": "안녕하세요",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 0,
+            "source_ids": []
+          },
+          {
+            "id": "policy-005",
+            "query": "고마워",
+            "hit_at_k": 1.0,
+            "recall_at_k": 1.0,
+            "mrr": 1.0,
+            "latency_ms": 0,
+            "source_ids": []
+          }
+        ]
+      }
+    }
+  },
+  "generation": {
+    "profiles": {
+      "qwen_direct:dense": {
+        "summary": {
+          "cases": 5,
+          "pass_rate": 1.0,
+          "accuracy": 0.98,
+          "term_coverage": 0.9333,
+          "grounded_block_ratio": 0.8667,
+          "citation_validity": 1.0,
+          "latency_ms": 18600.4
+        },
+        "cases": [
+          {
+            "id": "ai-001",
+            "query": "인공지능과 머신러닝, 딥러닝의 포함 관계를 설명해줘",
+            "passed": true,
+            "accuracy": 1.0,
+            "term_coverage": 1.0,
+            "grounded_block_ratio": 1.0,
+            "citation_validity": 1.0,
+            "behavior_correct": true,
+            "retrieval": {
+              "hit_at_k": 1.0,
+              "recall_at_k": 1.0,
+              "mrr": 1.0
+            },
+            "latency_ms": 19724,
+            "intent": "FACT_LOOKUP",
+            "coverage": "UNASSESSED",
+            "source_ids": [
+              3,
+              4,
+              7,
+              9
+            ],
+            "answer": "인공지능(AI)은 머신러닝(ML)을 포함하며, 머신러닝은 딥러닝(DL)을 포함합니다. AI는 인간의 지능을 모방하는 모든 기술을 포괄하고, ML은 데이터를 학습해 예측이나 분류를 수행하는 알고리즘 집합입니다 [근거 1]. DL은 ML의 한 유형으로, 신경망 구조를 활용해 복잡한 패턴을 처리합니다. 예를 들어, 전통적 ML은 퍼셉트론 없이 통계 기반 알고리즘(예: 의사결정 나무)을 사용하지만, DL은 다층 퍼셉트론과 역전파 알고리즘으로 깊은 신경망을 구축합니다. [근거 3]의 트랜스포머 모델처럼, DL은 Self-Attention 메커니즘을 통해 대규모 데이터 처리 능력을 확장했습니다. 이 계층 구조는 AI → ML → DL로 단계적으로 포함됩니다.",
+            "trace": [
+              {
+                "name": "question_planning",
+                "status": "completed",
+                "latency_ms": 10120,
+                "detail": "FACT_LOOKUP"
+              },
+              {
+                "name": "information_sufficiency",
+                "status": "completed",
+                "latency_ms": 0,
+                "detail": "sufficient"
+              },
+              {
+                "name": "retrieval",
+                "status": "completed",
+                "latency_ms": 20,
+                "detail": "dense: 4 candidates"
+              },
+              {
+                "name": "qwen_direct_generation",
+                "status": "completed",
+                "latency_ms": 9583,
+                "detail": "passed format checks"
+              }
+            ]
+          },
+          {
+            "id": "ai-002",
+            "query": "머신러닝은 사람이 규칙을 직접 입력하는 방식과 어떻게 다른가?",
+            "passed": true,
+            "accuracy": 1.0,
+            "term_coverage": 1.0,
+            "grounded_block_ratio": 1.0,
+            "citation_validity": 1.0,
+            "behavior_correct": true,
+            "retrieval": {
+              "hit_at_k": 1.0,
+              "recall_at_k": 1.0,
+              "mrr": 1.0
+            },
+            "latency_ms": 18458,
+            "intent": "FACT_LOOKUP",
+            "coverage": "UNASSESSED",
+            "source_ids": [
+              3,
+              4,
+              8,
+              15
+            ],
+            "answer": "머신러닝은 인간이 직접 규칙을 입력하는 방식과 달리, 대규모 데이터에서 통계학과 확률을 기반으로 스스로 규칙을 학습합니다. 머신러닝이 AI 구현 방법론 중 하나로, 인간의 조건문 규칙 입력 대신 기계가 데이터를 분석해 패턴을 도출한다고 설명합니다 [근거 1]. 이는 [근거 3]에서 언급된 전통적 체스 프로그램이나 단순 챗봇과 달리, 논리 회로처럼 인간이 직접 조건을 짜주는 한계가 없음을 강조합니다. 즉, 머신러닝은 데이터를 기반으로 규칙을 자동 생성하는 반면, 전통적 방식은 수작업으로 규칙을 정의해야 합니다.",
+            "trace": [
+              {
+                "name": "question_planning",
+                "status": "completed",
+                "latency_ms": 9962,
+                "detail": "FACT_LOOKUP"
+              },
+              {
+                "name": "information_sufficiency",
+                "status": "completed",
+                "latency_ms": 0,
+                "detail": "sufficient"
+              },
+              {
+                "name": "retrieval",
+                "status": "completed",
+                "latency_ms": 27,
+                "detail": "dense: 4 candidates"
+              },
+              {
+                "name": "qwen_direct_generation",
+                "status": "completed",
+                "latency_ms": 8467,
+                "detail": "passed format checks"
+              }
+            ]
+          },
+          {
+            "id": "ai-003",
+            "query": "딥러닝은 머신러닝 안에서 어떤 위치인가?",
+            "passed": true,
+            "accuracy": 1.0,
+            "term_coverage": 1.0,
+            "grounded_block_ratio": 1.0,
+            "citation_validity": 1.0,
+            "behavior_correct": true,
+            "retrieval": {
+              "hit_at_k": 1.0,
+              "recall_at_k": 1.0,
+              "mrr": 1.0
+            },
+            "latency_ms": 16503,
+            "intent": "FACT_LOOKUP",
+            "coverage": "UNASSESSED",
+            "source_ids": [
+              3,
+              4,
+              5,
+              9
+            ],
+            "answer": "딥러닝은 머신러닝의 하위 분야로, 인간 뇌 신경세포 구조를 기반으로 한 인공신경망(ANN)을 활용하는 학습 방식입니다 [근거 1]. 전통적 머신러닝과 달리 딥러닝은 퍼셉트론이라는 단위 요소를 수많은 층으로 쌓아 올려 복잡한 데이터 처리가 가능합니다 [근거 3]. 이는 순수한 통계학이나 기하학적 알고리즘을 사용하는 전통적 방법과 구조적으로 차별화됩니다 [근거 2]. 초기 딥러닝은 기울기 소실 문제로 발전이 저해되었으나, ReLU 함수 도입으로 해결되었습니다 [근거 4].",
+            "trace": [
+              {
+                "name": "question_planning",
+                "status": "completed",
+                "latency_ms": 8169,
+                "detail": "FACT_LOOKUP"
+              },
+              {
+                "name": "information_sufficiency",
+                "status": "completed",
+                "latency_ms": 0,
+                "detail": "sufficient"
+              },
+              {
+                "name": "retrieval",
+                "status": "completed",
+                "latency_ms": 22,
+                "detail": "dense: 4 candidates"
+              },
+              {
+                "name": "qwen_direct_generation",
+                "status": "completed",
+                "latency_ms": 8311,
+                "detail": "passed format checks"
+              }
+            ]
+          },
+          {
+            "id": "ai-004",
+            "query": "머신러닝에서 일반화가 의미하는 것은 무엇인가?",
+            "passed": true,
+            "accuracy": 0.9,
+            "term_coverage": 0.6667,
+            "grounded_block_ratio": 1.0,
+            "citation_validity": 1.0,
+            "behavior_correct": true,
+            "retrieval": {
+              "hit_at_k": 1.0,
+              "recall_at_k": 1.0,
+              "mrr": 1.0
+            },
+            "latency_ms": 21380,
+            "intent": "FACT_LOOKUP",
+            "coverage": "UNASSESSED",
+            "source_ids": [
+              3,
+              13,
+              7,
+              4
+            ],
+            "answer": "머신러닝에서 일반화는 모델이 학습 데이터의 패턴을 이해해 새로운, 보지 못한 데이터에서도 정확하게 예측하거나 판단할 수 있는 능력을 의미합니다. 이는 단순히 과거 데이터를 암기하는 것이 아니라, 문제의 본질적 특징을 파악하여 유연하게 대응하는 지능입니다([근거 1]).\n\n일반화는 모델의 신뢰성을 높이는 핵심 요소로, 예를 들어 센서 노이즈나 데이터 결측이 발생하더라도 다른 정보를 활용해 정확한 판단을 내리는 강건성(Robustness)을 구현하는 데 기여합니다([근거 2]와 [근거 3]).",
+            "trace": [
+              {
+                "name": "question_planning",
+                "status": "completed",
+                "latency_ms": 8702,
+                "detail": "FACT_LOOKUP"
+              },
+              {
+                "name": "information_sufficiency",
+                "status": "completed",
+                "latency_ms": 0,
+                "detail": "sufficient"
+              },
+              {
+                "name": "retrieval",
+                "status": "completed",
+                "latency_ms": 20,
+                "detail": "dense: 4 candidates"
+              },
+              {
+                "name": "qwen_direct_generation",
+                "status": "completed",
+                "latency_ms": 12657,
+                "detail": "passed format checks"
+              }
+            ]
+          },
+          {
+            "id": "classic-001",
+            "query": "선형 회귀와 로지스틱 회귀의 핵심 차이는?",
+            "passed": true,
+            "accuracy": 1.0,
+            "term_coverage": 1.0,
+            "grounded_block_ratio": 0.3333,
+            "citation_validity": 1.0,
+            "behavior_correct": true,
+            "retrieval": {
+              "hit_at_k": 1.0,
+              "recall_at_k": 1.0,
+              "mrr": 1.0
+            },
+            "latency_ms": 16937,
+            "intent": "FACT_LOOKUP",
+            "coverage": "PARTIAL",
+            "source_ids": [
+              14,
+              4,
+              11,
+              10
+            ],
+            "answer": "현재 근거만으로 확인하기 어려운 항목: 선택된 원문을 가리키는 유효한 인용이 없습니다.\n\n최종 답변의 형식을 안정적으로 생성하지 못해, 확인 가능한 원문 범위만 제공합니다.\n\n- 1세대: 선형 모델과 확률적 기초 (선형 결정 경계) 핵심 알고리즘: 로지스틱 회귀(Logistic Regression), 선형 회귀 수학적 원리: 단일 수식으로 변수 간의 독립적인 관계를 계산합니다. 특히 로지스틱 회귀는 출력값을 시그모이드 함수에 통과시켜 0과 1 사이의 '확률값'을 반환합니다. [근거 1]\n- 알고리즘 명칭 수학적 기반 및 상세 작동 원리 선형 및 로지스틱 회귀 (Regression) 데이터의 오차 분산이 가장 적은 최적의 1차 함수(추세선)를 한 번에 계산합니다. 로지스틱 회귀는 이 수식에 시그모이드(Sigmoid) 함수를 씌워 결과값을 0~1 사이의 확률로 변환, 이진 분류를 수행합니다. [근거 2]\n- 순환 신경망(RNN)과 장단기 메모리(LSTM) • 핵심 논문 (LSTM): \"Long Short-Term Memory\" (Hochreiter & Schmidhuber, 1997) 수학적 메커니즘 1: RNN의 재귀적 은닉 상태 (Hidden State) 순서가 있는 데이터(시간 흐름에 따른 센서 신호, 문장의 단어 등)를 처리하기 위해, \"이전 시간 단계(t-1)에서 도출된 은닉 상태값\"을 \"현재 시간(t)의 입력 데이터\"와 함께 수식에 밀어 넣습니다. [근거 3]\n- 이 과정은 마르코프 체인으로 정의되어 수학적으로 정확히 계산됩니다. • 역방향 복원 (Reverse Process): U-Net 구조를 가진 신경망이 이 노이즈 덩어리에서 \"바로 이전 단계의 노이즈가 무엇이었는지\"를 미분을 통해 예측하여 빼내는 과정을 1000번 반복 학습합니다. 결국 순수 노이즈에서 시작해 픽셀을 깎아내며 완벽한 이미지를 조각해 내는 원리입니다. [근거 4]",
+            "trace": [
+              {
+                "name": "question_planning",
+                "status": "completed",
+                "latency_ms": 8777,
+                "detail": "FACT_LOOKUP"
+              },
+              {
+                "name": "information_sufficiency",
+                "status": "completed",
+                "latency_ms": 0,
+                "detail": "sufficient"
+              },
+              {
+                "name": "retrieval",
+                "status": "completed",
+                "latency_ms": 19,
+                "detail": "dense: 4 candidates"
+              },
+              {
+                "name": "qwen_direct_generation",
+                "status": "completed",
+                "latency_ms": 8140,
+                "detail": "선택된 원문을 가리키는 유효한 인용이 없습니다."
+              }
+            ]
+          }
+        ]
+      },
+      "hierarchical:dense": {
+        "summary": {
+          "cases": 5,
+          "pass_rate": 1.0,
+          "accuracy": 1.0,
+          "term_coverage": 1.0,
+          "grounded_block_ratio": 1.0,
+          "citation_validity": 1.0,
+          "latency_ms": 30325.2
+        },
+        "cases": [
+          {
+            "id": "ai-001",
+            "query": "인공지능과 머신러닝, 딥러닝의 포함 관계를 설명해줘",
+            "passed": true,
+            "accuracy": 1.0,
+            "term_coverage": 1.0,
+            "grounded_block_ratio": 1.0,
+            "citation_validity": 1.0,
+            "behavior_correct": true,
+            "retrieval": {
+              "hit_at_k": 1.0,
+              "recall_at_k": 1.0,
+              "mrr": 1.0
+            },
+            "latency_ms": 36814,
+            "intent": "FACT_LOOKUP",
+            "coverage": "COMPLETE",
+            "source_ids": [
+              3
+            ],
+            "answer": "인공지능(AI)은 컴퓨터가 인간의 지능(인지, 추론, 판단)을 흉내 내도록 만드는 모든 기술을 포괄하는 가장 넓은 개념입니다[근거 1]. 머신러닝과 딥러닝은 이 인공지능이라는 큰 범주 안에 속하며, AI를 구현하기 위한 구체적인 방법론들입니다.\n\n세 가지는 명확한 포함 관계를 가집니다[근거 1].",
+            "trace": [
+              {
+                "name": "question_planning",
+                "status": "completed",
+                "latency_ms": 9833,
+                "detail": "FACT_LOOKUP"
+              },
+              {
+                "name": "information_sufficiency",
+                "status": "completed",
+                "latency_ms": 0,
+                "detail": "sufficient"
+              },
+              {
+                "name": "retrieval",
+                "status": "completed",
+                "latency_ms": 20,
+                "detail": "dense: 4 candidates"
+              },
+              {
+                "name": "evidence_structuring",
+                "status": "completed",
+                "latency_ms": 9483,
+                "detail": "COMPLETE: 1/4 selected"
+              },
+              {
+                "name": "gemma_generation_and_validation",
+                "status": "completed",
+                "latency_ms": 17477,
+                "detail": "passed; 0 retry issue(s)"
+              }
+            ]
+          },
+          {
+            "id": "ai-002",
+            "query": "머신러닝은 사람이 규칙을 직접 입력하는 방식과 어떻게 다른가?",
+            "passed": true,
+            "accuracy": 1.0,
+            "term_coverage": 1.0,
+            "grounded_block_ratio": 1.0,
+            "citation_validity": 1.0,
+            "behavior_correct": true,
+            "retrieval": {
+              "hit_at_k": 1.0,
+              "recall_at_k": 1.0,
+              "mrr": 1.0
+            },
+            "latency_ms": 28721,
+            "intent": "FACT_LOOKUP",
+            "coverage": "COMPLETE",
+            "source_ids": [
+              3
+            ],
+            "answer": "머신러닝은 사람이 직접 규칙을 입력하는 대신, 기계가 대규모 데이터를 분석하여 통계학과 확률에 기반한 규칙을 스스로 찾아내는 방법론입니다 [근거 1].\n\n과거의 체스 프로그램이나 단순 챗봇처럼 인간이 수많은 `if-else` 조건문 규칙을 하드코딩하던 방식과는 달리, 머신러닝은 데이터 자체를 학습하여 패턴을 인식하고 작동 원리를 구축합니다 [근거 1].",
+            "trace": [
+              {
+                "name": "question_planning",
+                "status": "completed",
+                "latency_ms": 10165,
+                "detail": "FACT_LOOKUP"
+              },
+              {
+                "name": "information_sufficiency",
+                "status": "completed",
+                "latency_ms": 0,
+                "detail": "sufficient"
+              },
+              {
+                "name": "retrieval",
+                "status": "completed",
+                "latency_ms": 19,
+                "detail": "dense: 4 candidates"
+              },
+              {
+                "name": "evidence_structuring",
+                "status": "completed",
+                "latency_ms": 9318,
+                "detail": "COMPLETE: 1/4 selected"
+              },
+              {
+                "name": "gemma_generation_and_validation",
+                "status": "completed",
+                "latency_ms": 9218,
+                "detail": "passed; 0 retry issue(s)"
+              }
+            ]
+          },
+          {
+            "id": "ai-003",
+            "query": "딥러닝은 머신러닝 안에서 어떤 위치인가?",
+            "passed": true,
+            "accuracy": 1.0,
+            "term_coverage": 1.0,
+            "grounded_block_ratio": 1.0,
+            "citation_validity": 1.0,
+            "behavior_correct": true,
+            "retrieval": {
+              "hit_at_k": 1.0,
+              "recall_at_k": 1.0,
+              "mrr": 1.0
+            },
+            "latency_ms": 24738,
+            "intent": "FACT_LOOKUP",
+            "coverage": "COMPLETE",
+            "source_ids": [
+              3
+            ],
+            "answer": "딥러닝은 머신러닝의 하위 분야 중 하나입니다[근거 1]. 이는 인간의 뇌 신경세포(퍼셉트론) 구조를 모방하여 수많은 층(Deep)으로 복잡하게 쌓아 올린 '인공신경망(ANN)'을 활용하는 특정한 학습 방식을 의미합니다[근거 1].",
+            "trace": [
+              {
+                "name": "question_planning",
+                "status": "completed",
+                "latency_ms": 8544,
+                "detail": "FACT_LOOKUP"
+              },
+              {
+                "name": "information_sufficiency",
+                "status": "completed",
+                "latency_ms": 0,
+                "detail": "sufficient"
+              },
+              {
+                "name": "retrieval",
+                "status": "completed",
+                "latency_ms": 29,
+                "detail": "dense: 4 candidates"
+              },
+              {
+                "name": "evidence_structuring",
+                "status": "completed",
+                "latency_ms": 7233,
+                "detail": "COMPLETE: 1/4 selected"
+              },
+              {
+                "name": "gemma_generation_and_validation",
+                "status": "completed",
+                "latency_ms": 8931,
+                "detail": "passed; 0 retry issue(s)"
+              }
+            ]
+          },
+          {
+            "id": "ai-004",
+            "query": "머신러닝에서 일반화가 의미하는 것은 무엇인가?",
+            "passed": true,
+            "accuracy": 1.0,
+            "term_coverage": 1.0,
+            "grounded_block_ratio": 1.0,
+            "citation_validity": 1.0,
+            "behavior_correct": true,
+            "retrieval": {
+              "hit_at_k": 1.0,
+              "recall_at_k": 1.0,
+              "mrr": 1.0
+            },
+            "latency_ms": 29342,
+            "intent": "FACT_LOOKUP",
+            "coverage": "COMPLETE",
+            "source_ids": [
+              3
+            ],
+            "answer": "머신러닝에서 일반화(Generalization)란 과거에 학습했던 정답을 단순히 암기하는 수준을 넘어, 문제의 본질적인 특징을 파악하여 처음 접하게 되는 낯선 데이터(미지의 데이터) 앞에서도 정확하고 범용적인 판단을 내릴 수 있는 지능적 능력을 의미합니다 [근거 1].\n\n이는 모델이 특정 학습 데이터에만 과도하게 의존하는 것이 아니라, 문제 자체의 근본 원리를 이해했기 때문에 새로운 상황이나 데이터를 만나더라도 그 패턴과 특징을 바탕으로 합리적인 추론을 할 수 있게 되는 것을 뜻합니다 [근거 1].",
+            "trace": [
+              {
+                "name": "question_planning",
+                "status": "completed",
+                "latency_ms": 9142,
+                "detail": "FACT_LOOKUP"
+              },
+              {
+                "name": "information_sufficiency",
+                "status": "completed",
+                "latency_ms": 0,
+                "detail": "sufficient"
+              },
+              {
+                "name": "retrieval",
+                "status": "completed",
+                "latency_ms": 19,
+                "detail": "dense: 4 candidates"
+              },
+              {
+                "name": "evidence_structuring",
+                "status": "completed",
+                "latency_ms": 7526,
+                "detail": "COMPLETE: 1/4 selected"
+              },
+              {
+                "name": "gemma_generation_and_validation",
+                "status": "completed",
+                "latency_ms": 12654,
+                "detail": "passed; 0 retry issue(s)"
+              }
+            ]
+          },
+          {
+            "id": "classic-001",
+            "query": "선형 회귀와 로지스틱 회귀의 핵심 차이는?",
+            "passed": true,
+            "accuracy": 1.0,
+            "term_coverage": 1.0,
+            "grounded_block_ratio": 1.0,
+            "citation_validity": 1.0,
+            "behavior_correct": true,
+            "retrieval": {
+              "hit_at_k": 1.0,
+              "recall_at_k": 1.0,
+              "mrr": 1.0
+            },
+            "latency_ms": 32011,
+            "intent": "FACT_LOOKUP",
+            "coverage": "COMPLETE",
+            "source_ids": [
+              14,
+              4
+            ],
+            "answer": "선형 회귀와 로지스틱 회귀의 핵심 차이는 출력값의 형태와 목적에 있습니다. 선형 회귀는 변수 간의 관계를 연속적인 값으로 계산하는 반면, 로지스틱 회귀는 이 결과를 시그모이드 함수(Sigmoid function)를 거쳐 0과 1 사이의 '확률값'으로 변환하여 이진 분류를 수행합니다 [근거 1], [근거 2].\n\n수학적 원리 측면에서, 선형 회귀는 데이터의 오차 분산이 가장 적은 최적의 1차 함수(추세선)를 단일 수식으로 계산하여 변수 간 독립적인 관계를 파악합니다 [근거 1], [근거 2]. 반면 로지스틱 회귀는 이 선형 모델의 결과값에 시그모이드 함수를 적용함으로써, 그 출력을 확률적 범위(0~1)로 제한하고 이를 통해 분류 작업을 수행하게 됩니다 [근거 1], [근거 2].",
+            "trace": [
+              {
+                "name": "question_planning",
+                "status": "completed",
+                "latency_ms": 9201,
+                "detail": "FACT_LOOKUP"
+              },
+              {
+                "name": "information_sufficiency",
+                "status": "completed",
+                "latency_ms": 0,
+                "detail": "sufficient"
+              },
+              {
+                "name": "retrieval",
+                "status": "completed",
+                "latency_ms": 21,
+                "detail": "dense: 4 candidates"
+              },
+              {
+                "name": "evidence_structuring",
+                "status": "completed",
+                "latency_ms": 8252,
+                "detail": "COMPLETE: 2/4 selected"
+              },
+              {
+                "name": "gemma_generation_and_validation",
+                "status": "completed",
+                "latency_ms": 14536,
+                "detail": "passed; 0 retry issue(s)"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "regressions": [],
+  "deltas": {
+    "qwen_direct:dense": {
+      "pass_rate": 0.0,
+      "accuracy": 0.0,
+      "grounded_block_ratio": 0.0,
+      "latency_ms": 0.0
+    },
+    "hierarchical:dense": {
+      "pass_rate": 0.0,
+      "accuracy": 0.0,
+      "grounded_block_ratio": 0.0,
+      "latency_ms": 0.0
+    }
+  }
+}

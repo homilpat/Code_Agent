@@ -44,36 +44,21 @@ class NoveltyJudge:
 
     def finalize(self, answer: str, plan: QueryPlan) -> str:
         cleaned = re.sub(
-            r"(?m)^\s*(?:#+\s*)?(?:직접 답변|근거 기반 설명|가능한 설계 방향|검증 필요)\s*:\s*",
+            r"(?m)^\s*(?:#+\s*)?(?:직접 답변|근거 기반 설명|가능한 설계 방향|기술적 가능성|검증 필요)\s*:\s*",
             "",
             answer,
         ).strip()
 
-        asks_to_design_algorithm = (
-            "알고리즘" in plan.original_query
-            and bool(re.search(r"새로|새로운|설계|만들|개발|고안|창안", plan.original_query))
-        )
-        if not asks_to_design_algorithm:
-            return cleaned
-
-        # This is a central judgment policy, not a source-derived factual claim.
-        # Applying it here keeps the verdict stable even when a small local model
-        # drifts back into evidence-summary prose.
         paragraphs = re.split(r"\n\s*\n", cleaned)
-        if paragraphs:
-            first_sentences = re.split(r"(?<=[.!?])\s+", paragraphs[0], maxsplit=1)
-            if first_sentences and re.search(r"가능|알고리즘|아키텍처", first_sentences[0]):
-                if len(first_sentences) == 2 and first_sentences[1].strip():
-                    paragraphs[0] = first_sentences[1].strip()
-                else:
-                    paragraphs = paragraphs[1:]
-        body = "\n\n".join(paragraphs).strip()
-        verdict = (
-            "가능합니다. 다만 기존 구성 요소를 새롭게 조합한 것은 보통 새로운 아키텍처이고, "
-            "계산 방식·손실함수·학습 규칙·업데이트 절차 중 하나 이상을 새로 정의했을 때 비로소 새 알고리즘 후보라고 볼 수 있습니다. "
-            "비교 실험으로 효과가 확인되기 전에는 검증된 새 알고리즘이라고 할 수 없습니다."
-        )
-        return verdict if not body else f"{verdict}\n\n{body}"
+        unique_paragraphs = []
+        seen = set()
+        for paragraph in paragraphs:
+            normalized = re.sub(r"[^0-9A-Za-z가-힣]+", "", paragraph).lower()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            unique_paragraphs.append(paragraph.strip())
+        return "\n\n".join(unique_paragraphs)
 
 
 novelty_judge = NoveltyJudge()

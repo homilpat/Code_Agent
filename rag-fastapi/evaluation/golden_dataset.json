@@ -1,0 +1,67 @@
+{
+  "version": "1.0",
+  "description": "Knowledge Hub의 검색, 근거성, 응답 정책을 함께 평가하는 50문항 golden set",
+  "cases": [
+    {"id":"ai-001","query":"인공지능과 머신러닝, 딥러닝의 포함 관계를 설명해줘","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[3],"required_terms":[["인공지능","AI"],["머신러닝"],["딥러닝"]],"tags":["fact"]},
+    {"id":"ai-002","query":"머신러닝은 사람이 규칙을 직접 입력하는 방식과 어떻게 다른가?","expected_intent":"COMPARISON","expected_behavior":"ANSWER","expected_source_ids":[3],"required_terms":[["규칙"],["데이터"],["학습","찾"]],"tags":["comparison"]},
+    {"id":"ai-003","query":"딥러닝은 머신러닝 안에서 어떤 위치인가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[3],"required_terms":[["하위"],["신경망"]],"tags":["fact"]},
+    {"id":"ai-004","query":"머신러닝에서 일반화가 의미하는 것은 무엇인가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[3],"required_terms":[["처음 보는","미지"],["암기"],["판단"]],"tags":["fact"]},
+
+    {"id":"classic-001","query":"선형 회귀와 로지스틱 회귀의 핵심 차이는?","expected_intent":"COMPARISON","expected_behavior":"ANSWER","expected_source_ids":[4,14],"required_terms":[["선형 회귀"],["로지스틱 회귀"],["시그모이드"],["이진 분류","확률"]],"tags":["comparison"]},
+    {"id":"classic-002","query":"SVM은 어떤 기준으로 결정 경계를 선택하는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[15,4],"required_terms":[["마진"],["최대"]],"tags":["fact"]},
+    {"id":"classic-003","query":"커널 트릭이 고차원 변환의 연산 부담을 줄이는 원리는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[15],"required_terms":[["내적"],["직접 변환","우회"],["고차원"]],"tags":["cause"]},
+    {"id":"classic-004","query":"KNN은 새로운 입력을 어떻게 분류하는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[4],"required_terms":[["거리"],["K개","이웃"],["다수결"]],"tags":["fact"]},
+
+    {"id":"perceptron-001","query":"퍼셉트론에서 가중치는 어떤 역할을 하나?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[5,8],"required_terms":[["입력"],["중요","영향"],["곱"]],"tags":["fact"]},
+    {"id":"perceptron-002","query":"퍼셉트론의 편향은 무엇을 조절하는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[5],"required_terms":[["기준","임계"],["조절"],["더"]],"tags":["fact"]},
+    {"id":"perceptron-003","query":"활성화 함수가 신경망에 필요한 이유는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[5],"required_terms":[["비선형"]],"tags":["cause"]},
+    {"id":"perceptron-004","query":"단층 퍼셉트론이 XOR 문제를 풀 수 없는 이유는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[8],"required_terms":[["직선","선형 결정 경계"],["XOR"],["분리"]],"tags":["cause"]},
+
+    {"id":"backprop-001","query":"오차 역전파는 무엇을 거꾸로 전달하는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[6,9],"required_terms":[["오차"],["기울기"],["가중치"]],"tags":["fact"]},
+    {"id":"backprop-002","query":"역전파에서 연쇄 법칙은 어떻게 사용되는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[9],"required_terms":[["미분"],["곱"],["층"]],"tags":["fact"]},
+    {"id":"backprop-003","query":"경사하강법에서 기울기는 어떤 방향 정보를 주는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[6,8],"required_terms":[["기울기"],["오차"],["반대 방향","가중치"]],"tags":["fact"]},
+    {"id":"backprop-004","query":"역전파를 사용하지 않는 학습 방식에는 무엇이 있는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[6],"required_terms":[["헵","Hebbian","진화 알고리즘","분석적 해법"]],"tags":["fact"]},
+
+    {"id":"mlp-001","query":"다층 퍼셉트론의 은닉층이 XOR 해결에 기여하는 방식은?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[9],"required_terms":[["은닉층"],["고차원","차원"],["분리"]],"tags":["cause"]},
+    {"id":"mlp-002","query":"시그모이드 함수가 계단 함수보다 역전파에 적합했던 이유는?","expected_intent":"COMPARISON","expected_behavior":"ANSWER","expected_source_ids":[9],"required_terms":[["미분"],["계단 함수"],["시그모이드"]],"tags":["comparison"]},
+    {"id":"mlp-003","query":"깊은 시그모이드 신경망에서 기울기가 사라지는 계산 원리는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[9,11],"required_terms":[["0.25"],["곱"],["층"]],"tags":["cause"]},
+    {"id":"mlp-004","query":"기울기 소실이 앞쪽 층의 학습에 미치는 영향은?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[9],"required_terms":[["앞쪽","입력층"],["0"],["학습","가중치"]],"tags":["cause"]},
+
+    {"id":"spatial-001","query":"ReLU가 시그모이드의 기울기 소실을 완화하는 원리는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[11],"required_terms":[["양수"],["미분값","기울기"],["1"]],"tags":["cause"]},
+    {"id":"spatial-002","query":"CNN의 파라미터 공유가 주는 효과는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[11],"required_terms":[["필터"],["공유"],["연산량"]],"tags":["cause"]},
+    {"id":"spatial-003","query":"최대 풀링은 특징 맵을 어떻게 축소하는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[11],"required_terms":[["구역"],["가장 큰","최대"]],"tags":["fact"]},
+    {"id":"spatial-004","query":"LSTM의 셀 상태와 게이트는 장기 기억에 어떻게 기여하는가?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[11],"required_terms":[["셀 상태"],["망각 게이트"],["입력 게이트"]],"tags":["cause"]},
+
+    {"id":"generative-001","query":"VAE의 잠재 공간은 데이터를 어떤 분포로 표현하는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[10],"required_terms":[["평균"],["표준편차","분산"],["정규 분포"]],"tags":["fact"]},
+    {"id":"generative-002","query":"VAE에서 재매개변수화 트릭이 필요한 이유는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[10],"required_terms":[["샘플링"],["미분"],["연쇄 법칙"]],"tags":["cause"]},
+    {"id":"generative-003","query":"GAN의 생성자와 판별자는 각각 어떤 목표를 가지는가?","expected_intent":"COMPARISON","expected_behavior":"ANSWER","expected_source_ids":[10],"required_terms":[["생성자"],["판별자"],["최소","속이"],["최대","판별"]],"tags":["comparison"]},
+    {"id":"generative-004","query":"확산 모델의 정방향과 역방향 과정은 어떻게 다른가?","expected_intent":"COMPARISON","expected_behavior":"ANSWER","expected_source_ids":[10],"required_terms":[["정방향"],["노이즈"],["역방향"],["복원"]],"tags":["comparison"]},
+
+    {"id":"transformer-001","query":"트랜스포머의 Q, K, V는 Self-Attention에서 어떻게 쓰이는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[12],"required_terms":[["Query","쿼리"],["Key","키"],["Value","값"],["내적"]],"tags":["fact"]},
+    {"id":"transformer-002","query":"트랜스포머가 RNN보다 병렬 처리에 유리한 이유는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[12,7],"required_terms":[["순서","순차"],["행렬"],["병렬"]],"tags":["cause"]},
+    {"id":"transformer-003","query":"Scaled Dot-Product Attention에서 내적값을 스케일링하는 이유는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[12],"required_terms":[["제곱근"],["내적"],["Softmax","소프트맥스"]],"tags":["cause"]},
+    {"id":"transformer-004","query":"Vision Transformer는 이미지를 어떻게 시퀀스로 바꾸는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[12],"required_terms":[["패치"],["16x16","타일"],["시퀀스"]],"tags":["fact"]},
+
+    {"id":"modern-001","query":"대조 학습에서 positive pair와 negative pair는 어떻게 다뤄지는가?","expected_intent":"COMPARISON","expected_behavior":"ANSWER","expected_source_ids":[12,7],"required_terms":[["Positive","같은 이미지"],["Negative","다른 이미지"],["당기","최대화"],["밀","척력"]],"tags":["comparison"]},
+    {"id":"modern-002","query":"MobileNetV2가 엣지 장치에 적합한 이유는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[7],"required_terms":[["깊이별 분리 합성곱","Depthwise"],["가볍","연산"]],"tags":["cause"]},
+    {"id":"modern-003","query":"Late Fusion은 서로 다른 센서 데이터를 언제 결합하는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[7,13],"required_terms":[["독립"],["특징","예측"],["메타 분류기","결합"]],"tags":["fact"]},
+    {"id":"modern-004","query":"Late Fusion이 센서 노이즈에 강한 이유는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[7,13],"required_terms":[["독립"],["노이즈","고장"],["강건"]],"tags":["cause"]},
+
+    {"id":"graph-001","query":"GraphRAG는 일반 벡터 검색과 무엇이 다른가?","expected_intent":"COMPARISON","expected_behavior":"ANSWER","expected_source_ids":[7,13],"required_terms":[["코사인","벡터"],["노드"],["엣지"],["다중 홉"]],"tags":["comparison"]},
+    {"id":"graph-002","query":"GNN의 메시지 패싱은 노드 정보를 어떻게 갱신하는가?","expected_intent":"FACT_LOOKUP","expected_behavior":"ANSWER","expected_source_ids":[13],"required_terms":[["이웃"],["가중합"],["업데이트"]],"tags":["fact"]},
+    {"id":"graph-003","query":"GraphRAG의 다중 홉 탐색이 필요한 이유는?","expected_intent":"CAUSE_ANALYSIS","expected_behavior":"ANSWER","expected_source_ids":[13,7],"required_terms":[["관계","엣지"],["다중 홉"],["인과","추론"]],"tags":["cause"]},
+    {"id":"graph-004","query":"트랜스포머와 지식 그래프를 결합한 설계가 가능한가?","expected_intent":"DESIGN_PROPOSAL","expected_behavior":"PARTIAL","expected_source_ids":[7,12,13],"required_terms":[["트랜스포머"],["지식 그래프","GraphRAG"]],"tags":["design","partial"]},
+
+    {"id":"unknown-001","query":"양자 오류 정정에 surface code를 적용하는 절차는?","expected_intent":"FACT_LOOKUP","expected_behavior":"NO_EVIDENCE","expected_source_ids":[],"required_terms":[],"tags":["unknown"]},
+    {"id":"unknown-002","query":"쿠버네티스에서 etcd 장애를 복구하는 명령어를 알려줘","expected_intent":"TROUBLESHOOTING","expected_behavior":"NO_EVIDENCE","expected_source_ids":[],"required_terms":[],"tags":["unknown"]},
+    {"id":"unknown-003","query":"반도체 식각 장비의 RF reflected power 알람 원인은?","expected_intent":"TROUBLESHOOTING","expected_behavior":"NO_EVIDENCE","expected_source_ids":[],"required_terms":[],"tags":["unknown"]},
+    {"id":"unknown-004","query":"Rust borrow checker의 lifetime elision 규칙은?","expected_intent":"FACT_LOOKUP","expected_behavior":"NO_EVIDENCE","expected_source_ids":[],"required_terms":[],"tags":["unknown"]},
+    {"id":"unknown-005","query":"Redis cluster의 hash slot 재분배 방법은?","expected_intent":"FACT_LOOKUP","expected_behavior":"NO_EVIDENCE","expected_source_ids":[],"required_terms":[],"tags":["unknown"]},
+
+    {"id":"policy-001","query":"나는 새로운 알고리즘을 만들고 싶어. 괜찮을까?","expected_intent":"NOVELTY_ASSESSMENT","expected_behavior":"CLARIFY","expected_source_ids":[],"required_terms":[["어떤 문제"],["규칙"]],"tags":["clarification"]},
+    {"id":"policy-002","query":"이거 왜 그래?","expected_intent":"FACT_LOOKUP","expected_behavior":"CLARIFY","expected_source_ids":[],"required_terms":[["어떤 대상","구체"]],"tags":["clarification"]},
+    {"id":"policy-003","query":"새 모델을 설계해줘","expected_intent":"DESIGN_PROPOSAL","expected_behavior":"CLARIFY","expected_source_ids":[],"required_terms":[["어떤 문제"],["조건"]],"tags":["clarification"]},
+    {"id":"policy-004","query":"안녕하세요","expected_intent":"GENERAL_CHAT","expected_behavior":"CHAT","expected_source_ids":[],"required_terms":[],"tags":["chat"]},
+    {"id":"policy-005","query":"고마워","expected_intent":"GENERAL_CHAT","expected_behavior":"CHAT","expected_source_ids":[],"required_terms":[],"tags":["chat"]}
+  ]
+}

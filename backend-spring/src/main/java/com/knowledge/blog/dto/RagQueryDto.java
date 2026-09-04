@@ -12,6 +12,10 @@ public class RagQueryDto {
         @com.fasterxml.jackson.annotation.JsonProperty("top_k")
         private Integer topK = 4;
         private List<HistoryMessage> history = List.of();
+        @com.fasterxml.jackson.annotation.JsonProperty("retrieval_mode")
+        private String retrievalMode = "dense";
+        @com.fasterxml.jackson.annotation.JsonProperty("generation_mode")
+        private String generationMode = "auto";
     }
 
     @Data
@@ -27,6 +31,26 @@ public class RagQueryDto {
         private List<SourceItem> sources;
         @com.fasterxml.jackson.annotation.JsonAlias("response_time_ms")
         private Integer responseTimeMs;
+        private String intent;
+        private String coverage;
+        @com.fasterxml.jackson.annotation.JsonAlias("retrieval_mode")
+        private String retrievalMode;
+        @com.fasterxml.jackson.annotation.JsonAlias("generation_mode")
+        private String generationMode;
+        @com.fasterxml.jackson.annotation.JsonAlias("selected_citation_count")
+        private Integer selectedCitationCount;
+        @com.fasterxml.jackson.annotation.JsonAlias("missing_points")
+        private List<String> missingPoints;
+        private List<TraceStep> trace;
+    }
+
+    @Data
+    public static class TraceStep {
+        private String name;
+        private String status;
+        @com.fasterxml.jackson.annotation.JsonAlias("latency_ms")
+        private Integer latencyMs;
+        private String detail;
     }
 
     @Data

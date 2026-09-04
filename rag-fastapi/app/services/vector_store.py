@@ -79,4 +79,30 @@ class VectorStoreService:
             logger.error('Search error: %s', e)
             return []
 
+    def scroll_payloads(
+        self,
+        limit: int = 1000,
+        domain_filter: Optional[str] = None,
+    ) -> List[Any]:
+        query_filter = None
+        if domain_filter and domain_filter != 'ALL':
+            query_filter = qmodels.Filter(
+                must=[qmodels.FieldCondition(
+                    key='category_section',
+                    match=qmodels.MatchValue(value=domain_filter),
+                )]
+            )
+        try:
+            points, _ = self.client.scroll(
+                collection_name=settings.QDRANT_COLLECTION,
+                scroll_filter=query_filter,
+                limit=limit,
+                with_payload=True,
+                with_vectors=False,
+            )
+            return points
+        except Exception as e:
+            logger.error('Payload scroll error: %s', e)
+            return []
+
 vector_store = VectorStoreService()

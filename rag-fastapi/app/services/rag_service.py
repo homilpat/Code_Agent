@@ -6,10 +6,13 @@ import json
 import html
 from typing import List, Dict
 from app.config import settings
-from app.models.schemas import IndexRequest, IndexResponse, QueryRequest, QueryResponse, ClassifyRequest, ClassifyResponse, DraftRequest, DraftResponse
+from app.models.schemas import IndexRequest, IndexResponse, QueryRequest, QueryResponse, TraceStep, ClassifyRequest, ClassifyResponse, DraftRequest, DraftResponse
+from app.services.generation_router import generation_router
 from app.services.answer_renderer import answer_renderer
 from app.services.claim_judge import claim_judge
 from app.services.evidence_retriever import EvidenceRetriever
+from app.services.evidence_structurer import evidence_structurer
+from app.services.information_sufficiency import information_sufficiency_judge
 from app.services.novelty_judge import novelty_judge
 from app.services.query_planner import query_planner
 from app.services.vector_store import vector_store
@@ -219,7 +222,7 @@ class RAGService:
                 for category in content_categories
             )
             response = self.llm_client.chat.completions.create(
-                model=settings.LLM_MODEL,
+                model=settings.PLANNER_MODEL or settings.LLM_MODEL,
                 messages=[
                     {
                         "role": "system",
@@ -336,14 +339,56 @@ class RAGService:
     def delete_source(self, source_type: str, source_id: int) -> None:
         vector_store.delete_by_source(source_type, source_id)
 
+    def retrieve_for_evaluation(self, req: QueryRequest) -> dict:
+        start_time = time.time()
+        plan = query_planner._fallback_plan(req.query)
+        if plan.needs_clarification or not plan.needs_retrieval:
+            return {
+                "query": req.query,
+                "intent": plan.intent.value,
+                "sources": [],
+                "retrieval_mode": req.retrieval_mode,
+                "latency_ms": int((time.time() - start_time) * 1000),
+            }
+        evidence = self.evidence_retriever.retrieve(
+            plan=plan,
+            top_k=req.top_k,
+            domain_filter=req.domain_filter,
+            retrieval_mode=req.retrieval_mode,
+        )
+        return {
+            "query": req.query,
+            "intent": plan.intent.value,
+            "sources": [source.model_dump() for source in evidence.sources],
+            "retrieval_mode": req.retrieval_mode,
+            "latency_ms": int((time.time() - start_time) * 1000),
+        }
+
     def answer_query(self, req: QueryRequest) -> QueryResponse:
         start_time = time.time()
+        trace = []
+        stage_start = time.time()
         plan = query_planner.plan(
             query=req.query,
             history=req.history,
             llm_client=self.llm_client,
-            model=settings.LLM_MODEL,
+            model=settings.PLANNER_MODEL or settings.LLM_MODEL,
         )
+        trace.append(TraceStep(
+            name="question_planning",
+            latency_ms=int((time.time() - stage_start) * 1000),
+            detail=(
+                f"{plan.intent.value} / {plan.question_structure.value}; "
+                f"synthesis={plan.requires_synthesis}; judgment={plan.requires_judgment}"
+            ),
+        ))
+        stage_start = time.time()
+        plan = information_sufficiency_judge.assess(plan)
+        trace.append(TraceStep(
+            name="information_sufficiency",
+            latency_ms=int((time.time() - stage_start) * 1000),
+            detail="clarification" if plan.needs_clarification else "sufficient",
+        ))
         logger.info(
             "Question plan mode=%s intent=%s resolved_query=%s confidence=%.2f",
             plan.planner_mode,
@@ -358,32 +403,201 @@ class RAGService:
                 answer=plan.clarification_question or "질문의 대상을 조금 더 구체적으로 알려주세요.",
                 sources=[],
                 response_time_ms=elapsed_ms,
+                intent=plan.intent.value,
+                coverage="NEEDS_CLARIFICATION",
+                retrieval_mode=req.retrieval_mode,
+                generation_mode=req.generation_mode,
+                trace=trace,
             )
+        if not plan.needs_retrieval:
+            if not self.llm_client:
+                answer = "지금은 대화 모델에 연결할 수 없습니다. 잠시 후 다시 시도해주세요."
+            else:
+                stage_start = time.time()
+                answer = answer_renderer.generate_conversation(
+                    self.llm_client,
+                    settings.ANSWER_MODEL or settings.LLM_MODEL,
+                    req.query,
+                    req.history,
+                )
+                if not answer:
+                    answer = "응답을 생성하지 못했습니다. 한 번만 다시 말씀해주시겠어요?"
+                trace.append(TraceStep(
+                    name="direct_generation",
+                    latency_ms=int((time.time() - stage_start) * 1000),
+                    detail="no retrieval",
+                ))
+            return QueryResponse(
+                query=req.query,
+                answer=answer,
+                sources=[],
+                response_time_ms=int((time.time() - start_time) * 1000),
+                intent=plan.intent.value,
+                coverage="NOT_APPLICABLE",
+                retrieval_mode=req.retrieval_mode,
+                generation_mode=req.generation_mode,
+                trace=trace,
+            )
+        stage_start = time.time()
         evidence = self.evidence_retriever.retrieve(
             plan=plan,
             top_k=req.top_k,
             domain_filter=req.domain_filter,
+            retrieval_mode=req.retrieval_mode,
         )
+        trace.append(TraceStep(
+            name="retrieval",
+            latency_ms=int((time.time() - stage_start) * 1000),
+            detail=f"{req.retrieval_mode}: {len(evidence.sources)} candidates",
+        ))
         sources = evidence.sources
+        coverage = "NO_EVIDENCE" if not evidence.has_evidence else "UNASSESSED"
+        missing_points = []
+        generation_decision = generation_router.decide(plan, req.generation_mode)
+        generation_mode = generation_decision.mode
+        trace.append(TraceStep(
+            name="generation_routing",
+            latency_ms=0,
+            detail=f"{generation_mode}: {generation_decision.reason}",
+        ))
 
         if self.llm_client and evidence.has_evidence:
             try:
-                draft_answer = answer_renderer.generate_draft(
+                if generation_mode == "qwen_direct":
+                    stage_start = time.time()
+                    candidate = answer_renderer.generate_draft(
+                        llm_client=self.llm_client,
+                        model=settings.PLANNER_MODEL or settings.LLM_MODEL,
+                        plan=plan,
+                        context_text=evidence.context_text,
+                        policy_instructions=novelty_judge.generation_instructions(plan),
+                    )
+                    valid_citations = {source.citation_number for source in sources}
+                    issues = claim_judge.quality_issues(candidate, valid_citations)
+                    if issues:
+                        answer = self._partial_evidence_answer(sources, issues)
+                        coverage = "PARTIAL"
+                        missing_points = issues
+                    else:
+                        answer = claim_judge.validate_citations(candidate, valid_citations)
+                        answer = novelty_judge.finalize(answer, plan)
+                        coverage = "UNASSESSED"
+                    trace.append(TraceStep(
+                        name="qwen_direct_generation",
+                        latency_ms=int((time.time() - stage_start) * 1000),
+                        detail="; ".join(issues) if issues else "passed format checks",
+                    ))
+                    return QueryResponse(
+                        query=req.query,
+                        answer=answer,
+                        sources=sources,
+                        response_time_ms=int((time.time() - start_time) * 1000),
+                        intent=plan.intent.value,
+                        coverage=coverage,
+                        retrieval_mode=req.retrieval_mode,
+                        generation_mode=generation_mode,
+                        selected_citation_count=len(sources),
+                        missing_points=missing_points,
+                        trace=trace,
+                    )
+
+                stage_start = time.time()
+                structured = evidence_structurer.structure(
                     llm_client=self.llm_client,
-                    model=settings.LLM_MODEL,
+                    model=settings.PLANNER_MODEL or settings.LLM_MODEL,
                     plan=plan,
-                    context_text=evidence.context_text,
-                    policy_instructions=novelty_judge.generation_instructions(plan),
+                    sources=sources,
                 )
-                answer = claim_judge.verify(
-                    llm_client=self.llm_client,
-                    model=settings.LLM_MODEL,
-                    plan=plan,
-                    context_text=evidence.context_text,
-                    draft_answer=draft_answer,
-                    extra_instructions=novelty_judge.verification_instructions(plan),
-                )
-                answer = novelty_judge.finalize(answer, plan)
+                coverage = structured.coverage
+                missing_points = structured.missing_points
+                selected_sources = evidence_structurer.select_sources(structured, sources)
+                trace.append(TraceStep(
+                    name="evidence_structuring",
+                    latency_ms=int((time.time() - stage_start) * 1000),
+                    detail=f"{coverage}: {len(selected_sources)}/{len(sources)} selected",
+                ))
+                if not selected_sources:
+                    answer = self._partial_evidence_answer(
+                        [],
+                        structured.missing_points,
+                    )
+                    sources = []
+                    elapsed_ms = int((time.time() - start_time) * 1000)
+                    return QueryResponse(
+                        query=req.query,
+                        answer=answer,
+                        sources=sources,
+                        response_time_ms=elapsed_ms,
+                        intent=plan.intent.value,
+                        coverage=coverage,
+                        retrieval_mode=req.retrieval_mode,
+                        generation_mode=generation_mode,
+                        selected_citation_count=0,
+                        missing_points=missing_points,
+                        trace=trace,
+                    )
+                valid_citations = {
+                    source.citation_number for source in selected_sources
+                }
+                answer = ""
+                retry_feedback = ""
+                generation_stage_start = time.time()
+                validation_failures = []
+                for generation_attempt in range(2):
+                    candidate = answer_renderer.generate_final(
+                        llm_client=self.llm_client,
+                        model=settings.ANSWER_MODEL or settings.LLM_MODEL,
+                        plan=plan,
+                        structured=structured,
+                        sources=selected_sources,
+                        policy_instructions=(
+                            novelty_judge.generation_instructions(plan)
+                            + novelty_judge.verification_instructions(plan)
+                            + retry_feedback
+                        ),
+                    )
+                    issues = claim_judge.quality_issues(
+                        candidate,
+                        valid_citations,
+                        require_partial_disclosure=structured.coverage == "PARTIAL",
+                    )
+                    if not issues:
+                        cleaned = claim_judge.validate_citations(candidate, valid_citations)
+                        cleaned = novelty_judge.finalize(cleaned, plan)
+                        issues = claim_judge.quality_issues(
+                            cleaned,
+                            valid_citations,
+                            require_partial_disclosure=structured.coverage == "PARTIAL",
+                        )
+                        if not issues:
+                            answer = cleaned
+                            break
+                    logger.warning(
+                        "Final answer quality attempt %d failed: %s",
+                        generation_attempt + 1,
+                        "; ".join(issues),
+                    )
+                    validation_failures.extend(issues)
+                    retry_feedback = (
+                        " 이전 답변은 다음 검사를 통과하지 못했습니다: "
+                        + "; ".join(issues)
+                        + " 같은 오류 없이 답변 전체를 다시 작성하세요."
+                    )
+                if not answer:
+                    answer = self._partial_evidence_answer(
+                        selected_sources,
+                        structured.missing_points,
+                    )
+                trace.append(TraceStep(
+                    name="gemma_generation_and_validation",
+                    latency_ms=int((time.time() - generation_stage_start) * 1000),
+                    detail=(
+                        f"fallback after {len(validation_failures)} validation issue(s)"
+                        if not answer or answer.startswith("현재 근거만으로")
+                        else f"passed; {len(validation_failures)} retry issue(s)"
+                    ),
+                ))
+                sources = selected_sources
             except Exception as e:
                 logger.error("LM Studio LLM Generation error: %s", e)
                 answer = '검색된 원문 근거를 확인해주세요.\n\n' + '\n\n'.join(
@@ -402,7 +616,42 @@ class RAGService:
             query=req.query,
             answer=answer,
             sources=sources,
-            response_time_ms=elapsed_ms
+            response_time_ms=elapsed_ms,
+            intent=plan.intent.value,
+            coverage=coverage,
+            retrieval_mode=req.retrieval_mode,
+            generation_mode=generation_mode,
+            selected_citation_count=len(sources),
+            missing_points=missing_points,
+            trace=trace,
+        )
+
+    @staticmethod
+    def _partial_evidence_answer(sources, missing_points=None) -> str:
+        if not sources:
+            if missing_points:
+                return (
+                    "현재 저장된 근거만으로는 질문에 답하기 어렵습니다.\n\n"
+                    "확인되지 않은 항목:\n- "
+                    + "\n- ".join(missing_points)
+                )
+            return "현재 확인된 원문만으로는 답변을 구성하기 어렵습니다. 관련 자료를 보강해주세요."
+        evidence_lines = [
+            f"- {source.snippet.strip()} [근거 {source.citation_number}]"
+            for source in sources
+            if source.snippet.strip()
+        ]
+        missing_notice = ""
+        if missing_points:
+            missing_notice = (
+                "현재 근거만으로 확인하기 어려운 항목: "
+                + ", ".join(missing_points)
+                + "\n\n"
+            )
+        return (
+            missing_notice
+            + "최종 답변의 형식을 안정적으로 생성하지 못해, 확인 가능한 원문 범위만 제공합니다.\n\n"
+            + "\n".join(evidence_lines)
         )
 
 rag_service = RAGService()

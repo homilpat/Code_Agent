@@ -12,6 +12,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -42,6 +43,16 @@ public class RagService {
             fallback.setResponseTimeMs(0);
             return fallback;
         }
+    }
+
+    public Map<String, Object> latestEvaluation() {
+        return webClientBuilder.baseUrl(fastApiUrl).build()
+                .get()
+                .uri("/api/rag/evaluation/latest")
+                .retrieve()
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
+                .retryWhen(ragConnectionRetry())
+                .block();
     }
 
     public RagQueryDto.ClassifyResponse classifyPost(RagQueryDto.ClassifyRequest request) {

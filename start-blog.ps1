@@ -6,8 +6,10 @@ $ErrorActionPreference = 'Stop'
 $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DockerCli = Join-Path $env:LOCALAPPDATA 'Programs\DockerDesktop\resources\bin\docker.exe'
 $LmsCli = Join-Path $env:USERPROFILE '.lmstudio\bin\lms.exe'
-$ModelKey = 'qwen/qwen3-8b'
-$ModelIdentifier = 'local-model'
+$PlannerModelKey = 'qwen/qwen3-8b'
+$PlannerModelIdentifier = 'planner-model'
+$AnswerModelKey = 'google/gemma-4-e4b'
+$AnswerModelIdentifier = 'answer-model'
 $LmStudioPort = 1234
 $BlogUrl = 'http://localhost:3000'
 $ApiUrl = 'http://localhost:8080/api/posts'
@@ -75,16 +77,32 @@ try {
     }
     Write-Host "LM Studio API 서버 준비 완료 (포트 $LmStudioPort)" -ForegroundColor Green
 
-    Write-Step 'Qwen 모델 확인'
+    Write-Step '계층형 LLM 모델 확인'
     $modelsResponse = Invoke-RestMethod -Uri "http://127.0.0.1:$LmStudioPort/v1/models" -TimeoutSec 5
-    $modelLoaded = @($modelsResponse.data | Where-Object { $_.id -eq $ModelIdentifier }).Count -gt 0
-    if (-not $modelLoaded) {
-        & $LmsCli load $ModelKey --identifier $ModelIdentifier --context-length 8192 --gpu max -y
+    $legacyModelLoaded = @($modelsResponse.data | Where-Object { $_.id -eq 'local-model' }).Count -gt 0
+    if ($legacyModelLoaded) {
+        & $LmsCli unload local-model
+        $modelsResponse = Invoke-RestMethod -Uri "http://127.0.0.1:$LmStudioPort/v1/models" -TimeoutSec 5
+    }
+
+    $plannerLoaded = @($modelsResponse.data | Where-Object { $_.id -eq $PlannerModelIdentifier }).Count -gt 0
+    if (-not $plannerLoaded) {
+        & $LmsCli load $PlannerModelKey --identifier $PlannerModelIdentifier --context-length 8192 --parallel 1 --gpu max -y
         if ($LASTEXITCODE -ne 0) {
-            throw 'Qwen 모델 로드에 실패했습니다.'
+            throw 'Qwen Planner 모델 로드에 실패했습니다.'
         }
     }
-    Write-Host "$ModelIdentifier 모델 준비 완료" -ForegroundColor Green
+    Write-Host "$PlannerModelIdentifier 준비 완료" -ForegroundColor Green
+
+    $modelsResponse = Invoke-RestMethod -Uri "http://127.0.0.1:$LmStudioPort/v1/models" -TimeoutSec 5
+    $answerLoaded = @($modelsResponse.data | Where-Object { $_.id -eq $AnswerModelIdentifier }).Count -gt 0
+    if (-not $answerLoaded) {
+        & $LmsCli load $AnswerModelKey --identifier $AnswerModelIdentifier --context-length 8192 --parallel 1 --gpu max -y
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Gemma Answer 모델 로드에 실패했습니다.'
+        }
+    }
+    Write-Host "$AnswerModelIdentifier 준비 완료" -ForegroundColor Green
 
     Write-Step '블로그 전체 서비스 실행'
     & $DockerCli compose up -d

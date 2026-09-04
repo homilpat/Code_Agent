@@ -5,6 +5,7 @@ from typing import Callable, List, Optional
 
 from app.models.schemas import SourceItem
 from app.services.query_planner import QueryPlan
+from app.services.retrieval_strategies import RankedHit, bm25_ranker, cross_encoder_reranker
 
 
 @dataclass(frozen=True)
@@ -35,22 +36,41 @@ class EvidenceRetriever:
         plan: QueryPlan,
         top_k: int,
         domain_filter: Optional[str],
+        retrieval_mode: str = "dense",
     ) -> EvidenceBundle:
         query_vector = self.embed_query(plan.search_query)
-        candidate_limit = max(top_k * 3, top_k)
-        hits = self.vector_store.search(
+        candidate_limit = max(top_k * 6, 24)
+        rerank_limit = max(top_k * 3, 12)
+        dense_hits = self.vector_store.search(
             query_vector=query_vector,
             limit=candidate_limit,
             domain_filter=domain_filter,
         )
+        # MIN_SEARCH_SCORE is a cosine-similarity threshold. Apply it only to
+        # dense scores; RRF and cross-encoder scores use different scales.
+        dense_hits = [hit for hit in dense_hits if hit.score >= self.min_score]
+        if retrieval_mode == "dense":
+            hits = dense_hits
+        else:
+            points = self.vector_store.scroll_payloads(
+                limit=1000,
+                domain_filter=domain_filter,
+            )
+            lexical_hits = bm25_ranker.rank(plan.search_query, points, candidate_limit)
+            hits = self._reciprocal_rank_fusion(dense_hits, lexical_hits, candidate_limit)
+            if retrieval_mode == "hybrid_rerank":
+                hits = cross_encoder_reranker.rerank(
+                    plan.search_query,
+                    hits,
+                    rerank_limit,
+                )
+            hits = self._normalize_scores(hits)
 
         selected = []
         per_source_count = defaultdict(int)
         seen_content = set()
 
         for hit in hits:
-            if hit.score < self.min_score:
-                continue
             payload = hit.payload or {}
             source_key = (
                 str(payload.get("source_type", "POST")),
@@ -97,3 +117,29 @@ class EvidenceRetriever:
             sources=sources,
             context_text="\n\n".join(context_chunks),
         )
+
+    @staticmethod
+    def _reciprocal_rank_fusion(dense_hits, lexical_hits, limit: int):
+        fused = {}
+        for result_list in (dense_hits, lexical_hits):
+            for rank, hit in enumerate(result_list, start=1):
+                key = str(hit.id)
+                payload = hit.payload or {}
+                if key not in fused:
+                    fused[key] = RankedHit(key, payload, 0.0)
+                fused[key].score += 1.0 / (60 + rank)
+        return sorted(fused.values(), key=lambda item: item.score, reverse=True)[:limit]
+
+    @staticmethod
+    def _normalize_scores(hits):
+        """Expose non-cosine rankings on a stable 0..1 display scale."""
+        if not hits:
+            return []
+        low = min(hit.score for hit in hits)
+        high = max(hit.score for hit in hits)
+        if high == low:
+            return [RankedHit(hit.id, hit.payload, 1.0) for hit in hits]
+        return [
+            RankedHit(hit.id, hit.payload, (hit.score - low) / (high - low))
+            for hit in hits
+        ]

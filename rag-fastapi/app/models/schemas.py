@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 
 class DocumentChunk(BaseModel):
     content: str
@@ -41,12 +41,28 @@ class QueryRequest(BaseModel):
     domain_filter: Optional[str] = None
     top_k: int = 4
     history: List[HistoryMessage] = Field(default_factory=list)
+    retrieval_mode: Literal["dense", "hybrid", "hybrid_rerank"] = "dense"
+    generation_mode: Literal["auto", "hierarchical", "qwen_direct"] = "auto"
+
+
+class TraceStep(BaseModel):
+    name: str
+    status: str = "completed"
+    latency_ms: int = 0
+    detail: Optional[str] = None
 
 class QueryResponse(BaseModel):
     query: str
     answer: str
     sources: List[SourceItem]
     response_time_ms: int
+    intent: Optional[str] = None
+    coverage: Optional[str] = None
+    retrieval_mode: str = "dense"
+    generation_mode: str = "auto"
+    selected_citation_count: int = 0
+    missing_points: List[str] = Field(default_factory=list)
+    trace: List[TraceStep] = Field(default_factory=list)
 
 class CategoryCandidate(BaseModel):
     id: int

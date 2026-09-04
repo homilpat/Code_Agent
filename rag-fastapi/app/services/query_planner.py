@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class QueryIntent(str, Enum):
+    GENERAL_CHAT = "GENERAL_CHAT"
     FACT_LOOKUP = "FACT_LOOKUP"
     COMPARISON = "COMPARISON"
     CAUSE_ANALYSIS = "CAUSE_ANALYSIS"
@@ -17,6 +18,16 @@ class QueryIntent(str, Enum):
     DESIGN_PROPOSAL = "DESIGN_PROPOSAL"
     NOVELTY_ASSESSMENT = "NOVELTY_ASSESSMENT"
     VALIDATION_PLAN = "VALIDATION_PLAN"
+
+
+class QuestionStructure(str, Enum):
+    DIRECT_LOOKUP = "DIRECT_LOOKUP"
+    COMPARATIVE = "COMPARATIVE"
+    CAUSAL = "CAUSAL"
+    PROCEDURAL = "PROCEDURAL"
+    SYNTHESIS = "SYNTHESIS"
+    JUDGMENT = "JUDGMENT"
+    CONVERSATIONAL = "CONVERSATIONAL"
 
 
 class SubQuestion(BaseModel):
@@ -38,6 +49,10 @@ class PlannerOutput(BaseModel):
     constraints: List[str] = Field(default_factory=list)
     sub_questions: List[SubQuestion] = Field(default_factory=list)
     requested_tasks: List[str] = Field(default_factory=list)
+    question_structure: QuestionStructure = QuestionStructure.DIRECT_LOOKUP
+    requires_synthesis: bool = False
+    requires_judgment: bool = False
+    evidence_aspects: List[str] = Field(default_factory=list)
     needs_retrieval: bool = True
     needs_comparison: bool = False
     needs_clarification: bool = False
@@ -75,6 +90,10 @@ class QueryPlan(BaseModel):
     constraints: List[str] = Field(default_factory=list)
     sub_questions: List[SubQuestion] = Field(default_factory=list)
     requested_tasks: List[str] = Field(default_factory=list)
+    question_structure: QuestionStructure = QuestionStructure.DIRECT_LOOKUP
+    requires_synthesis: bool = False
+    requires_judgment: bool = False
+    evidence_aspects: List[str] = Field(default_factory=list)
     needs_retrieval: bool = True
     needs_comparison: bool = False
     needs_clarification: bool = False
@@ -93,8 +112,25 @@ class QueryPlan(BaseModel):
 
 
 class QueryPlanner:
-    _NOVELTY_PATTERN = re.compile(r"새로운|신규|독창|최초|특허|논문|알고리즘")
-    _DESIGN_PATTERN = re.compile(r"설계|아키텍처|구조|만들|구현|조합|개선")
+    _STRUCTURE_BY_INTENT = {
+        QueryIntent.GENERAL_CHAT: QuestionStructure.CONVERSATIONAL,
+        QueryIntent.FACT_LOOKUP: QuestionStructure.DIRECT_LOOKUP,
+        QueryIntent.COMPARISON: QuestionStructure.COMPARATIVE,
+        QueryIntent.CAUSE_ANALYSIS: QuestionStructure.CAUSAL,
+        QueryIntent.TROUBLESHOOTING: QuestionStructure.PROCEDURAL,
+        QueryIntent.DESIGN_PROPOSAL: QuestionStructure.SYNTHESIS,
+        QueryIntent.NOVELTY_ASSESSMENT: QuestionStructure.JUDGMENT,
+        QueryIntent.VALIDATION_PLAN: QuestionStructure.JUDGMENT,
+    }
+    _GENERAL_CHAT_PATTERN = re.compile(
+        r"^(?:안녕(?:하세요)?|반가워|고마워|감사(?:합니다)?|잘했어|좋아|ㅇㅇ+|오케이|"
+        r"그래|괜찮아|뭐해|도와줄 수 있어)\s*[.!?~ㅋㅎ]*$",
+        re.IGNORECASE,
+    )
+    _NOVELTY_PATTERN = re.compile(r"새로운|신규|독창|최초|특허|논문")
+    _DESIGN_PATTERN = re.compile(
+        r"설계|아키텍처|구조|만들|구현|조합|개선|추가|변경|수정|대체|도입"
+    )
     _VALIDATION_PATTERN = re.compile(r"검증|평가|실험|어블레이션|재현")
     _TROUBLE_PATTERN = re.compile(r"오류|에러|고장|장애|알람|트러블|해결|복구")
     _COMPARE_PATTERN = re.compile(r"비교|차이|대비|어느 .*좋|장단점")
@@ -142,6 +178,10 @@ class QueryPlanner:
                 {"intent": "FACT_LOOKUP", "query": "검색 가능한 하위 질문"}
             ],
             "requested_tasks": ["필요한 작업"],
+            "question_structure": "DIRECT_LOOKUP",
+            "requires_synthesis": False,
+            "requires_judgment": False,
+            "evidence_aspects": ["답변에 필요한 근거 관점"],
             "needs_retrieval": True,
             "needs_comparison": False,
             "needs_clarification": False,
@@ -152,8 +192,12 @@ class QueryPlanner:
         allowed = ", ".join(intent.value for intent in QueryIntent)
         system_prompt = (
             "당신은 질문에 답하는 모델이 아니라 질문을 작업 계획으로 변환하는 분석기입니다. "
+            "인사·감사·가벼운 대화처럼 저장 문서가 없어도 답할 수 있는 요청은 primary_intent를 GENERAL_CHAT으로, needs_retrieval을 false로 설정하세요. "
+            "기술 사실, 비교, 설계, 검증처럼 저장된 지식의 확인이 유용한 요청은 needs_retrieval을 true로 유지하세요. "
             "사용자의 표면적인 키워드보다 대화 문맥과 실제 목표를 우선하세요. "
             "대명사와 생략된 대상을 최근 대화에서 복원하고, 복합 질문은 독립적으로 검색 가능한 하위 질문으로 분해하세요. "
+            "질문의 추론 구조를 DIRECT_LOOKUP, COMPARATIVE, CAUSAL, PROCEDURAL, SYNTHESIS, JUDGMENT, CONVERSATIONAL 중 하나로 분류하세요. "
+            "여러 근거를 관계로 연결해야 하면 requires_synthesis를, 선택·신규성·타당성을 판정해야 하면 requires_judgment를 true로 하고 필요한 근거 관점을 evidence_aspects에 기록하세요. "
             "대화 문맥으로도 복원할 수 없고 정보 부족으로 답의 방향이 크게 달라질 때만 ambiguities에 모호한 표현, 이유, 사용자에게 물을 질문을 기록하고 needs_clarification을 true로 설정하세요. "
             "확인 질문은 사용자에게 바로 보여줄 한 문장의 자연스러운 한국어로 작성하세요. JSON 키, 변수명, intent, entity, missing field 같은 내부 용어를 노출하지 마세요. "
             "가능하면 사용자가 쓴 모호한 표현을 짚고 무엇을 알려주면 되는지 구체적으로 물으세요. 단순히 '다시 질문해주세요'라고만 말하지 마세요. "
@@ -207,18 +251,45 @@ class QueryPlanner:
                             "대상의 이름을 함께 적어주시면 정확히 찾아볼게요."
                         )
                 resolved = re.sub(r"\s+", " ", parsed.resolved_query).strip()
+                guarded_intent = self._guard_intent(query, parsed.primary_intent)
+                guarded_structure = self._guard_structure(
+                    guarded_intent,
+                    parsed.question_structure,
+                )
+                is_general_chat = guarded_intent == QueryIntent.GENERAL_CHAT
                 return QueryPlan(
                     original_query=query,
                     resolved_query=resolved,
                     search_query=resolved,
-                    intent=parsed.primary_intent,
+                    intent=guarded_intent,
                     user_goal=parsed.user_goal,
                     entities=parsed.entities[:10],
                     constraints=parsed.constraints[:10],
                     sub_questions=parsed.sub_questions[:6],
                     requested_tasks=parsed.requested_tasks[:8],
-                    needs_retrieval=parsed.needs_retrieval,
-                    needs_comparison=parsed.needs_comparison,
+                    question_structure=guarded_structure,
+                    requires_synthesis=(
+                        parsed.requires_synthesis
+                        or guarded_structure in {
+                            QuestionStructure.COMPARATIVE,
+                            QuestionStructure.CAUSAL,
+                            QuestionStructure.PROCEDURAL,
+                            QuestionStructure.SYNTHESIS,
+                            QuestionStructure.JUDGMENT,
+                        }
+                    ),
+                    requires_judgment=(
+                        parsed.requires_judgment
+                        or guarded_structure == QuestionStructure.JUDGMENT
+                    ),
+                    evidence_aspects=parsed.evidence_aspects[:8],
+                    # The routing boundary is code-owned. The model classifies the
+                    # intent, but cannot skip retrieval for a knowledge task.
+                    needs_retrieval=not is_general_chat,
+                    needs_comparison=(
+                        parsed.needs_comparison
+                        or guarded_intent == QueryIntent.COMPARISON
+                    ),
                     needs_clarification=parsed.needs_clarification,
                     ambiguities=parsed.ambiguities[:5],
                     clarification_question=clarification_question,
@@ -235,6 +306,34 @@ class QueryPlanner:
                 logger.warning("Question planning attempt %d failed: %s", attempt + 1, error)
 
         return None
+
+    def _guard_intent(self, query: str, intent: QueryIntent) -> QueryIntent:
+        """Prevent model under-classification from bypassing assurance routing."""
+        has_novelty = bool(self._NOVELTY_PATTERN.search(query))
+        has_design = bool(self._DESIGN_PATTERN.search(query))
+        if self._VALIDATION_PATTERN.search(query) and (has_novelty or has_design):
+            return QueryIntent.VALIDATION_PLAN
+        if has_novelty and has_design:
+            return QueryIntent.NOVELTY_ASSESSMENT
+        if self._TROUBLE_PATTERN.search(query):
+            return QueryIntent.TROUBLESHOOTING
+        if self._COMPARE_PATTERN.search(query):
+            return QueryIntent.COMPARISON
+        if self._CAUSE_PATTERN.search(query):
+            return QueryIntent.CAUSE_ANALYSIS
+        if has_design and intent == QueryIntent.FACT_LOOKUP:
+            return QueryIntent.DESIGN_PROPOSAL
+        return intent
+
+    def _guard_structure(
+        self,
+        intent: QueryIntent,
+        inferred: QuestionStructure,
+    ) -> QuestionStructure:
+        expected = self._STRUCTURE_BY_INTENT[intent]
+        if intent in {QueryIntent.FACT_LOOKUP, QueryIntent.GENERAL_CHAT}:
+            return inferred if intent == QueryIntent.FACT_LOOKUP else expected
+        return expected
 
     @staticmethod
     def _extract_json(raw: str) -> dict:
@@ -255,6 +354,18 @@ class QueryPlanner:
         return "\n".join(lines)
 
     def _fallback_plan(self, query: str) -> QueryPlan:
+        if self._GENERAL_CHAT_PATTERN.fullmatch(query.strip()):
+            return QueryPlan(
+                original_query=query,
+                resolved_query=query,
+                search_query=query,
+                intent=QueryIntent.GENERAL_CHAT,
+                user_goal="일반 대화에 자연스럽게 응답",
+                requested_tasks=["일반 대화 응답"],
+                question_structure=QuestionStructure.CONVERSATIONAL,
+                needs_retrieval=False,
+                confidence=0.95,
+            )
         ambiguous_match = self._AMBIGUOUS_REFERENCE_PATTERN.search(query)
         vague_short = bool(self._VAGUE_SHORT_PATTERN.fullmatch(query.strip()))
         if ambiguous_match or vague_short:
@@ -313,6 +424,20 @@ class QueryPlanner:
             intent=intent,
             user_goal=query,
             requested_tasks=tasks,
+            question_structure=self._STRUCTURE_BY_INTENT[intent],
+            requires_synthesis=intent in {
+                QueryIntent.COMPARISON,
+                QueryIntent.CAUSE_ANALYSIS,
+                QueryIntent.TROUBLESHOOTING,
+                QueryIntent.DESIGN_PROPOSAL,
+                QueryIntent.NOVELTY_ASSESSMENT,
+                QueryIntent.VALIDATION_PLAN,
+            },
+            requires_judgment=intent in {
+                QueryIntent.NOVELTY_ASSESSMENT,
+                QueryIntent.VALIDATION_PLAN,
+            },
+            evidence_aspects=tasks,
             planner_mode="RULE_FALLBACK",
         )
 

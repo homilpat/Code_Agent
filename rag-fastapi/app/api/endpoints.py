@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.models.schemas import IndexRequest, IndexResponse, QueryRequest, QueryResponse, ClassifyRequest, ClassifyResponse, DraftRequest, DraftResponse
 from app.services.rag_service import rag_service
+from app.services.evaluation_report import evaluation_report_service
 
 router = APIRouter(prefix='/api/rag', tags=['RAG'])
 
@@ -21,6 +22,19 @@ def query_rag(request: QueryRequest):
 @router.get('/health')
 def health_check():
     return {'status': 'ok', 'service': 'FastAPI RAG Engine'}
+
+
+@router.post('/evaluation/retrieve')
+def evaluate_retrieval(request: QueryRequest):
+    try:
+        return rag_service.retrieve_for_evaluation(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get('/evaluation/latest')
+def latest_evaluation():
+    return evaluation_report_service.latest()
 
 @router.post('/classify', response_model=ClassifyResponse)
 def classify_post(request: ClassifyRequest):

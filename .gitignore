@@ -50,4 +50,8 @@ blogProject_design/
 frontend-nextjs/design/
 frontend-nextjs/supabase/
 **/AGENTS.md
+!/AGENTS.md
 **/CLAUDE.md
+
+# Keep the latest portfolio evaluation, not every timestamped local run
+rag-fastapi/evaluation/results/report-*.json
