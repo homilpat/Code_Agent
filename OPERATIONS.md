@@ -19,7 +19,7 @@ Docker Compose가 다음 서비스를 함께 실행합니다.
 ## 2. 최초 실행 전 준비
 
 1. Docker Desktop을 설치하고 실행합니다.
-2. LM Studio를 사용하는 경우 모델과 로컬 API 서버를 먼저 실행합니다.
+2. LM Studio를 사용하는 경우 Qwen3 8B와 Gemma 4 E4B 모델 및 로컬 API 서버를 먼저 실행합니다. `start-blog.ps1`을 사용하면 두 모델을 각각 `planner-model`, `answer-model` 식별자로 자동 로드합니다.
 3. 프로젝트 루트에 `.env` 파일이 있는지 확인합니다.
 4. `.env`의 비밀번호, JWT 비밀키, 포트 및 서비스 주소를 올바르게 설정합니다.
 
@@ -41,6 +41,8 @@ docker compose up -d --build
 ```text
 http://localhost:3000
 ```
+
+일반 질의의 `generation_mode` 기본값은 `auto`입니다. 최초 Planner가 질문을 직접 조회·비교·인과·절차·종합·판단 구조로 분석합니다. 직접 조회는 `qwen_direct`, 근거 종합이나 판단이 필요한 구조는 `hierarchical`로 선택됩니다. 평가 시에는 두 값을 명시해 자동 라우팅을 우회할 수 있습니다.
 
 ## 4. 상태 확인
 
@@ -171,7 +173,7 @@ docker compose logs --tail=100 backend-spring
 
 ### AI 분류 또는 RAG 질문이 실패하는 경우
 
-- LM Studio API 서버와 사용할 모델이 실행 중인지 확인합니다.
+- LM Studio API 서버와 `planner-model`, `answer-model`이 모두 실행 중인지 확인합니다.
 - `rag-fastapi`와 `vector-db` 상태를 확인합니다.
 - `.env`의 LM Studio 및 RAG 관련 주소를 확인합니다.
 

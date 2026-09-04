@@ -15,7 +15,7 @@
 | 핵심 가치 | 개인 기술 문서를 검색 가능한 지식으로 전환하고 답변의 출처를 원문까지 연결 |
 | AI 실행 방식 | BGE-M3 임베딩 + Qdrant 검색 + LM Studio 로컬 LLM |
 | 서비스 구성 | Next.js, Spring Boot, FastAPI, MySQL, Qdrant를 Docker Compose로 통합 |
-| 현재 상태 | 게시글 CRUD·자동 색인·근거 기반 질의응답·대화 저장·인증/권한·이미지 관리 구현 |
+| 현재 상태 | 게시글 CRUD·자동 색인·조건부 생성 RAG·50문항 검색 평가·대화 저장·인증/권한·이미지 관리 구현 |
 
 ## 핵심 기능
 
@@ -39,7 +39,9 @@
 
 - 최소 유사도 미만의 검색 결과와 중복 청크를 제거합니다.
 - 한 게시글이 검색 결과를 독점하지 않도록 출처별 최대 1개 청크만 채택합니다.
-- 초안 생성 후 별도의 Claim Judge가 원문과 주장을 다시 대조합니다.
+- 단순 사실 질문은 Qwen3 8B가 직접 작성하고, 비교·원인·트러블슈팅·설계·신규성·검증 질문은 Qwen이 근거를 구조화한 뒤 Gemma 4 E4B가 최종 답변을 생성합니다.
+- 요청에서 `qwen_direct` 또는 `hierarchical`을 지정하면 자동 선택을 우회할 수 있어 동일 조건 A/B 평가가 가능합니다.
+- 최종 단계에서는 모델 재작성 대신 코드가 인용 번호와 출처 존재 여부를 검증합니다.
 - 사실 주장이 포함된 답변 블록에는 `[근거 N]`을 유지하고, 근거 카드에서 원문 게시글로 이동할 수 있습니다.
 - 설계 질문에서는 구성 요소 조합을 `새 아키텍처`, 계산·학습·업데이트 규칙의 변화를 `새 알고리즘 후보`로 구분합니다.
 
@@ -64,7 +66,8 @@ flowchart LR
 
     F -->|Embedding| B[BGE-M3]
     F -->|Vector Search| Q[(Qdrant)]
-    F -->|Planning / Generation / Judge| L[LM Studio<br/>Qwen3 8B]
+    F -->|Planning / Evidence JSON| P[LM Studio<br/>Qwen3 8B]
+    F -->|Final Answer| L[LM Studio<br/>Gemma 4 E4B]
 
     S -. Post create/update/delete .-> F
     F -. Vector lifecycle sync .-> Q
@@ -79,17 +82,20 @@ flowchart TD
     A[질문 + 최근 대화] --> B[Query Planner]
     B -->|LLM JSON| C[Pydantic 검증]
     C -->|실패| D[Safe Fallback<br/>모호하면 확인 질문]
-    C -->|성공| P{추가 확인 필요?}
-    P -->|아니오| E[검색 질문 복원]
-    P -->|예| X[자연어 확인 질문 반환]
+    C -->|성공| P[Information Sufficiency Judge]
+    P -->|정보 충분| E[검색 질문 복원]
+    P -->|정보 부족| X[자연어 확인 질문 반환]
     D -->|명확한 질문| E
     D -->|대상 불명확| X[자연어 확인 질문 반환]
     E --> F[BGE-M3 임베딩]
-    F --> G[Qdrant 후보 검색<br/>top_k × 3]
-    G --> H[점수 필터 + 중복 제거<br/>출처별 청크 제한]
-    H --> I[Answer Renderer]
-    I --> J[Claim Judge<br/>원문-주장 재검증]
-    J --> K[Novelty Judge<br/>설계·신규성 중앙 판정]
+    F --> G[Dense / Hybrid / Rerank 후보 검색<br/>평가 가능한 전략 분리]
+    G --> H[점수 체계별 필터 + 중복 제거<br/>출처별 청크 제한]
+    H --> R{Generation Router}
+    R -->|단순 사실| Q[Qwen Direct<br/>빠른 생성]
+    R -->|비교·원인·설계·검증| I[Qwen Evidence Structurer<br/>필요 근거·사실 JSON]
+    I --> J[Gemma Answer Renderer<br/>선택 원문 직접 대조·최종 생성]
+    Q --> K[코드 인용 검증 + Novelty Judge]
+    J --> K
     K --> L[최종 답변 + 근거 카드]
 ```
 
@@ -125,10 +131,15 @@ RAG 로직을 다음 서비스로 분리해 검색, 판정, 표현을 독립적�
 ```text
 rag-fastapi/app/services/
 ├── query_planner.py       # 질문 의도·문맥·하위 작업 분석
+├── information_sufficiency.py # 검색 전 정보 충족도 판정
 ├── evidence_retriever.py  # 후보 검색·점수 필터·출처 다양성
-├── claim_judge.py         # 생성 문장과 원문 근거 대조
+├── retrieval_strategies.py # BM25·RRF·Cross-Encoder 검색 전략
+├── generation_router.py   # 질문 구조·종합·판단 요구 기반 생성 경로 선택
+├── evidence_structurer.py # Qwen 기반 필요 근거·사실 JSON 구조화
+├── evaluation_report.py   # 최신 golden 평가 결과 제공
+├── claim_judge.py         # 최종 인용 형식의 결정론적 검증
 ├── novelty_judge.py       # 아키텍처/알고리즘 신규성 판정 정책
-├── answer_renderer.py     # 의도별 자연어 답변 생성
+├── answer_renderer.py     # Gemma 기반 최종 자연어 답변 생성
 └── rag_service.py         # 전체 파이프라인 오케스트레이션
 ```
 
@@ -137,7 +148,9 @@ rag-fastapi/app/services/
 | 문제 | 원인 분석 | 적용한 해결책 | 결과 |
 |---|---|---|---|
 | 후속 질문의 검색 정확도 저하 | 대명사와 생략된 대상이 검색어에 반영되지 않음 | 최근 대화 기반 `resolved_query`, 모호성 JSON, 자연어 확인 질문, Safe Fallback | 문맥으로 복원하거나 검색 전 사용자에게 대상을 확인 |
-| 답변은 자연스럽지만 근거가 약함 | 생성 모델이 관련 문장을 직접 근거처럼 확대 해석 | 초안과 검증 모델 역할 분리, 인용 블록 필터, 중앙 판정 정책 | 근거·추론·제안의 표현 범위를 통제 |
+| 답변은 자연스럽지만 근거가 약함 | 생성 모델이 관련 문장을 직접 근거처럼 확대 해석 | Qwen 근거 구조화, Gemma 원문 대조 생성, 코드 인용 검증 | 근거 선택과 최종 표현의 책임 분리 |
+| 검색 전략을 감으로 선택 | dense·BM25·reranker의 품질/지연 비용을 같은 기준으로 비교할 수 없음 | 50문항 golden set, Recall@K·MRR·지연 측정, 검색 전략 A/B | 현재 데이터에서는 dense Hit@K 0.90으로 기본값 유지 |
+| 파이프라인 변경 후 과거 실패 재발 | 실패 사례와 요청 단계가 별도 기록되지 않음 | 실패 자동 회귀 등록, 단계별 trace, 평가 대시보드 | 결과·지연·실패 원인을 요청 단위로 확인 |
 | 동일 게시글 청크가 결과를 독점 | 유사한 인접 청크의 점수가 함께 높게 계산됨 | 후보를 넓게 조회한 뒤 중복 제거, 출처별 1개 청크 제한 | 여러 게시글을 비교할 수 있는 근거 구성 |
 | 수정 후 과거 내용이 계속 검색됨 | 원문과 벡터 저장소의 생명주기 불일치 | 재색인 전 기존 source 청크 삭제, 삭제 API 연동 | 게시글 상태와 검색 인덱스 일관성 확보 |
 | RAG 재배포 직후 `Connection refused` | Spring의 Docker DNS 캐시에 이전 컨테이너 IP가 남음 | RAG health check, DNS TTL 5초, 지수 백오프 재시도 | RAG 준비 후 Spring 시작 및 주소 자동 갱신 |
@@ -151,7 +164,7 @@ rag-fastapi/app/services/
 | Backend | Java 17, Spring Boot 3.2, Spring Security, MyBatis | 인증·권한·트랜잭션 중심의 비즈니스 API 구성 |
 | AI/RAG | Python, FastAPI, Pydantic 2, Sentence Transformers | 모델 연동과 검색 파이프라인을 빠르게 실험하고 검증 |
 | Embedding | BGE-M3 | 한국어와 기술 문서 검색을 위한 다국어 임베딩 |
-| Local LLM | LM Studio, Qwen3 8B | 외부 API로 원문을 전송하지 않는 로컬 추론 환경 |
+| Local LLM | LM Studio, Qwen3 8B, Gemma 4 E4B | 단순 질의는 Qwen 직접 생성, 복잡 질의는 Qwen 구조화→Gemma 생성으로 비용과 품질을 조절 |
 | Storage | MySQL 8, Qdrant | 원본 관계형 데이터와 검색용 벡터 데이터의 책임 분리 |
 | Infra | Docker Compose, NVIDIA GPU | 5개 서비스를 재현 가능한 단일 실행 환경으로 통합 |
 
@@ -173,10 +186,11 @@ rag-fastapi/app/services/
 
 ```text
 질문과 대화 이력
-  → 의도 분석 및 독립 질문 복원
-  → 벡터 후보 검색과 근거 선별
-  → 답변 초안 생성
-  → 원문 근거 재검증
+  → 의도·질문 구조 분석 및 독립 질문 복원
+  → 벡터 후보 검색
+  → 직접 조회: Qwen 직접 생성
+  → 종합·판단: Qwen 근거 JSON 구조화 후 Gemma 최종 생성
+  → 코드 기반 인용 검증
   → 답변과 클릭 가능한 출처 반환
 ```
 
@@ -203,7 +217,7 @@ blogProject/
 - Docker Desktop 및 WSL2
 - NVIDIA GPU와 Docker GPU 접근 환경
 - LM Studio CLI
-- LM Studio에서 사용할 `qwen/qwen3-8b` 모델
+- LM Studio에서 사용할 `qwen/qwen3-8b`, `google/gemma-4-e4b` 모델
 
 ### 1. 환경변수 준비
 
@@ -223,7 +237,7 @@ powershell -ExecutionPolicy Bypass -File .\start-blog.ps1
 
 1. Docker Desktop 실행 및 준비 확인
 2. LM Studio API 서버 실행
-3. Qwen3 8B 모델 로드
+3. Qwen3 8B Planner와 Gemma 4 E4B Answer 모델 로드
 4. Docker Compose 전체 서비스 실행
 5. 백엔드와 프런트엔드 응답 확인
 6. `http://localhost:3000` 열기
@@ -281,17 +295,18 @@ MySQL만 원본 데이터로 취급하고 Qdrant는 언제든 재구축할 수 �
 ## 현재 한계
 
 - 인용 번호가 존재하더라도 문장 전체의 의미가 원문과 완전히 일치하는지는 추가 검증이 필요합니다.
-- 검색 결과 재순위화를 위한 Cross-Encoder와 정량 평가 데이터셋은 아직 적용하지 않았습니다.
-- 로컬 LLM을 세 차례 호출하는 질의는 응답 지연이 큽니다.
+- 50문항 검색 평가는 완료했지만 생성 A/B는 우선 5문항 표본이므로 일반적 우위로 단정할 수 없습니다.
+- Cross-Encoder는 현재 CPU 환경에서 평균 5.3초의 검색 지연을 추가하고 dense보다 낮은 Hit@K를 보여 기본 경로에서 제외했습니다.
+- 자동 라우팅은 질문 구조와 근거 종합·판단 필요성을 사용하지만, 최종 Auto 혼합 경로의 전체 50문항 평가는 아직 수행하지 않았습니다.
 - PDF 업로드·페이지 단위 출처·OCR 파이프라인은 로드맵 단계입니다.
 - 현재 실행 스크립트와 GPU 설정은 Windows + NVIDIA 환경에 최적화되어 있습니다.
 
 ## 다음 개선 계획
 
 1. 주장 단위 JSON 판정과 인용 entailment 검사
-2. Cross-Encoder 재순위화 및 검색 품질 평가셋 구축
+2. Qwen 단독·전체 계층형·Auto 혼합을 동일 Golden 50문항으로 평가하고 사람 평가와 자동 지표의 상관관계 검증
 3. Query Planner 결과 캐싱과 조건부 LLM 호출로 응답 시간 단축
-4. 비동기 색인·실패 재처리·관측성 지표 추가
+4. 실패 사례의 승인·버전 관리와 CI 회귀 평가 연결
 5. PDF 구조 인식, OCR, 페이지 단위 출처 제공
 6. 제조 공정·장비·증상·원인·조치 관계를 활용한 GraphRAG 확장
 
@@ -299,6 +314,7 @@ MySQL만 원본 데이터로 취급하고 Qdrant는 언제든 재구축할 수 �
 
 - [상세 기능 명세](./FEATURES.md)
 - [실행 및 운영 가이드](./OPERATIONS.md)
+- [LLM/RAG 발전 과정](./LLM_EVOLUTION.md)
 - [개발 로드맵](./Task.md)
 
 ---
