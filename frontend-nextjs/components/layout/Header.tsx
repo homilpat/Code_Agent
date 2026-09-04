@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AuthUser, clearAuth, getUser } from '@/lib/auth-client';
 
-const baseLinks=[{href:'/',icon:'▦',label:'Knowledge Feed'},{href:'/write',icon:'＋',label:'게시물 올리기'}];
+const baseLinks=[{href:'/',icon:'▦',label:'Knowledge Feed'},{href:'/evaluation',icon:'◫',label:'RAG Evaluation'},{href:'/write',icon:'＋',label:'게시물 올리기'}];
 export default function Header(){
   const pathname=usePathname(); const router=useRouter(); const[user,setUser]=useState<AuthUser|null>(null);
   useEffect(()=>{const sync=()=>setUser(getUser());sync();window.addEventListener('auth-change',sync);return()=>window.removeEventListener('auth-change',sync)},[]);
