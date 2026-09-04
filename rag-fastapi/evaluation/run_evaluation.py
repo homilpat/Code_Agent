@@ -11,6 +11,23 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 DEFAULT_DATASET = ROOT / "golden_dataset.json"
 DEFAULT_RESULTS = ROOT / "results"
+EXPECTED_STRUCTURE_BY_INTENT = {
+    "GENERAL_CHAT": "CONVERSATIONAL",
+    "FACT_LOOKUP": "DIRECT_LOOKUP",
+    "COMPARISON": "COMPARATIVE",
+    "CAUSE_ANALYSIS": "CAUSAL",
+    "TROUBLESHOOTING": "PROCEDURAL",
+    "DESIGN_PROPOSAL": "SYNTHESIS",
+    "NOVELTY_ASSESSMENT": "JUDGMENT",
+    "VALIDATION_PLAN": "JUDGMENT",
+}
+HIERARCHICAL_STRUCTURES = {
+    "COMPARATIVE",
+    "CAUSAL",
+    "PROCEDURAL",
+    "SYNTHESIS",
+    "JUDGMENT",
+}
 
 
 def post_json(url: str, payload: dict, timeout: int = 600) -> dict:
@@ -58,6 +75,30 @@ def grounded_block_ratio(answer: str) -> float:
     return grounded / len(blocks)
 
 
+def trace_question_structure(response: dict) -> str:
+    for step in response.get("trace", []):
+        if step.get("name") != "question_planning":
+            continue
+        match = re.search(
+            r"/\s*(DIRECT_LOOKUP|COMPARATIVE|CAUSAL|PROCEDURAL|SYNTHESIS|JUDGMENT|CONVERSATIONAL)\s*;",
+            step.get("detail", ""),
+        )
+        if match:
+            return match.group(1)
+    return "UNKNOWN"
+
+
+def expected_question_structure(case: dict) -> str:
+    return EXPECTED_STRUCTURE_BY_INTENT.get(case.get("expected_intent"), "UNKNOWN")
+
+
+def expected_generation_mode(case: dict) -> str:
+    if case.get("expected_behavior") in {"CLARIFY", "CHAT"}:
+        return "bypass"
+    structure = expected_question_structure(case)
+    return "hierarchical" if structure in HIERARCHICAL_STRUCTURES else "qwen_direct"
+
+
 def score_generation(case: dict, response: dict) -> dict:
     answer = response.get("answer", "")
     sources = response.get("sources", [])
@@ -83,6 +124,11 @@ def score_generation(case: dict, response: dict) -> dict:
     else:
         behavior_ok = bool(answer and sources)
     accuracy = 0.4 * float(behavior_ok) + 0.3 * term_score + 0.3 * retrieval["hit_at_k"]
+    expected_structure = expected_question_structure(case)
+    actual_structure = trace_question_structure(response)
+    expected_mode = expected_generation_mode(case)
+    actual_mode = response.get("generation_mode", "UNKNOWN")
+    normalized_actual_mode = "bypass" if actual_mode == "auto" else actual_mode
     return {
         "id": case["id"],
         "query": case["query"],
@@ -95,7 +141,16 @@ def score_generation(case: dict, response: dict) -> dict:
         "retrieval": retrieval,
         "latency_ms": response.get("response_time_ms", 0),
         "intent": response.get("intent"),
+        "expected_intent": case.get("expected_intent"),
+        "intent_correct": response.get("intent") == case.get("expected_intent"),
+        "question_structure": actual_structure,
+        "expected_question_structure": expected_structure,
+        "structure_correct": actual_structure == expected_structure,
+        "generation_mode": actual_mode,
+        "expected_generation_mode": expected_mode,
+        "routing_correct": normalized_actual_mode == expected_mode,
         "coverage": coverage,
+        "tags": case.get("tags", []),
         "source_ids": [source.get("source_id") for source in sources],
         "answer": answer,
         "trace": response.get("trace", []),
@@ -126,6 +181,72 @@ def summarize_retrieval(rows: list[dict]) -> dict:
         "recall_at_k": round(statistics.fmean(row["recall_at_k"] for row in rows), 4) if rows else 0,
         "mrr": round(statistics.fmean(row["mrr"] for row in rows), 4) if rows else 0,
         "latency_ms": round(statistics.fmean(row["latency_ms"] for row in rows), 1) if rows else 0,
+    }
+
+
+def route_counts(rows: list[dict]) -> dict:
+    counts = {"qwen_direct": 0, "hierarchical": 0, "bypass": 0, "unknown": 0}
+    for row in rows:
+        mode = row.get("generation_mode")
+        key = "bypass" if mode == "auto" else mode
+        counts[key if key in counts else "unknown"] += 1
+    return counts
+
+
+def summarize_routing(rows: list[dict]) -> dict:
+    total = len(rows)
+    correct = sum(bool(row.get("routing_correct")) for row in rows)
+    structure_known = [row for row in rows if row.get("question_structure") != "UNKNOWN"]
+    confusion = {}
+    for row in rows:
+        key = f"{row.get('expected_question_structure', 'UNKNOWN')}->{row.get('question_structure', 'UNKNOWN')}"
+        confusion[key] = confusion.get(key, 0) + 1
+    return {
+        "cases": total,
+        "correct": correct,
+        "accuracy": round(correct / total, 4) if total else 0.0,
+        "intent_accuracy": round(
+            sum(bool(row.get("intent_correct")) for row in rows) / total, 4
+        ) if total else 0.0,
+        "structure_accuracy": round(
+            sum(bool(row.get("structure_correct")) for row in structure_known) / len(structure_known), 4
+        ) if structure_known else 0.0,
+        "wrong_direct": sum(
+            row.get("generation_mode") == "qwen_direct"
+            and row.get("expected_generation_mode") == "hierarchical"
+            for row in rows
+        ),
+        "unnecessary_hierarchical": sum(
+            row.get("generation_mode") == "hierarchical"
+            and row.get("expected_generation_mode") == "qwen_direct"
+            for row in rows
+        ),
+        "missed_bypass": sum(
+            row.get("expected_generation_mode") == "bypass"
+            and row.get("generation_mode") != "auto"
+            for row in rows
+        ),
+        "unexpected_bypass": sum(
+            row.get("expected_generation_mode") != "bypass"
+            and row.get("generation_mode") == "auto"
+            for row in rows
+        ),
+        "selected": route_counts(rows),
+        "structure_confusion": confusion,
+    }
+
+
+def summarize_by_structure(rows: list[dict]) -> dict:
+    grouped = {}
+    for row in rows:
+        structure = row.get("expected_question_structure", "UNKNOWN")
+        grouped.setdefault(structure, []).append(row)
+    return {
+        structure: {
+            "summary": summarize_generation(items),
+            "selected_routes": route_counts(items),
+        }
+        for structure, items in grouped.items()
     }
 
 
@@ -189,6 +310,34 @@ def markdown_report(report: dict) -> str:
             f"{summary['accuracy']:.3f} | {summary['grounded_block_ratio']:.3f} | "
             f"{summary['citation_validity']:.3f} | {summary['latency_ms']:.1f} |"
         )
+    routing = report.get("analysis", {}).get("auto_routing", {})
+    if routing:
+        lines.extend([
+            "",
+            "## Auto routing",
+            "",
+            "| 문항 | 경로 정확도 | Intent 정확도 | 구조 정확도 | 잘못된 직접 | 불필요한 계층형 | 우회 실패 |",
+            "|---:|---:|---:|---:|---:|---:|---:|",
+            f"| {routing['cases']} | {routing['accuracy']:.3f} | "
+            f"{routing['intent_accuracy']:.3f} | {routing['structure_accuracy']:.3f} | "
+            f"{routing['wrong_direct']} | {routing['unnecessary_hierarchical']} | "
+            f"{routing['missed_bypass'] + routing['unexpected_bypass']} |",
+            "",
+            "## Quality by expected question structure",
+            "",
+            "| 프로필 | 구조 | 문항 | 통과율 | 정확성 | 근거 블록 | 인용 유효성 | 평균 지연(ms) | 경로 분포 |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---|",
+        ])
+        for profile, structures in report.get("analysis", {}).get("by_expected_structure", {}).items():
+            for structure, value in structures.items():
+                summary = value["summary"]
+                selected = value["selected_routes"]
+                routes = ", ".join(f"{key}:{count}" for key, count in selected.items() if count)
+                lines.append(
+                    f"| {profile} | {structure} | {summary['cases']} | {summary['pass_rate']:.3f} | "
+                    f"{summary['accuracy']:.3f} | {summary['grounded_block_ratio']:.3f} | "
+                    f"{summary['citation_validity']:.3f} | {summary['latency_ms']:.1f} | {routes} |"
+                )
     lines.extend(["", "## 실패 사례", ""])
     for item in report["regressions"][:20]:
         lines.append(f"- `{item['profile']}` / `{item['id']}`: {item['query']}")
@@ -245,7 +394,7 @@ def main():
     for profile in profiles_to_run:
         generation_mode, retrieval_mode = profile.split(":", 1)
         rows = []
-        for case in generation_cases:
+        for index, case in enumerate(generation_cases, 1):
             response = post_json(
                 f"{args.base_url}/api/rag/query",
                 {
@@ -257,6 +406,10 @@ def main():
                 },
             )
             rows.append(score_generation(case, response))
+            print(
+                f"[generation] {profile} {index}/{len(generation_cases)} {case['id']}",
+                flush=True,
+            )
         generation_profiles[profile] = {"summary": summarize_generation(rows), "cases": rows}
 
     regressions = [
@@ -274,6 +427,14 @@ def main():
         "retrieval": {"profiles": retrieval_profiles},
         "generation": {"profiles": generation_profiles},
         "regressions": regressions,
+    }
+    auto_rows = generation_profiles.get("auto:dense", {}).get("cases", [])
+    report["analysis"] = {
+        "auto_routing": summarize_routing(auto_rows) if auto_rows else {},
+        "by_expected_structure": {
+            profile: summarize_by_structure(result["cases"])
+            for profile, result in generation_profiles.items()
+        },
     }
     report["deltas"] = previous_deltas(previous, report) if previous else {}
     timestamp = re.sub(r"[^0-9]", "", created_at)[:14]

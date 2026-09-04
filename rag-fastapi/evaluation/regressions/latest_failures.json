@@ -1,4 +1,1172 @@
 {
-  "created_at": "2026-09-03T06:17:03+00:00",
-  "cases": []
+  "created_at": "2026-09-04T02:16:15+00:00",
+  "cases": [
+    {
+      "profile": "qwen_direct:dense",
+      "id": "spatial-003",
+      "query": "최대 풀링은 특징 맵을 어떻게 축소하는가?",
+      "passed": false,
+      "accuracy": 0.7,
+      "term_coverage": 0.0,
+      "grounded_block_ratio": 1.0,
+      "citation_validity": 1.0,
+      "behavior_correct": true,
+      "retrieval": {
+        "hit_at_k": 1.0,
+        "recall_at_k": 1.0,
+        "mrr": 1.0
+      },
+      "latency_ms": 15349,
+      "intent": "FACT_LOOKUP",
+      "expected_intent": "FACT_LOOKUP",
+      "intent_correct": true,
+      "question_structure": "DIRECT_LOOKUP",
+      "expected_question_structure": "DIRECT_LOOKUP",
+      "structure_correct": true,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "qwen_direct",
+      "routing_correct": true,
+      "coverage": "UNASSESSED",
+      "tags": [
+        "fact"
+      ],
+      "source_ids": [
+        11,
+        15,
+        12,
+        7
+      ],
+      "answer": "이 과정은 풀링 연산을 통해 특징 맵의 해상도를 낮추며, 중요한 정보만 유지해 계산량을 줄이고 일반화 능력을 높이는 역할을 합니다. [근거 1]",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 9536,
+          "detail": "FACT_LOOKUP / DIRECT_LOOKUP; synthesis=False; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 20,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "qwen_direct: explicit evaluation override"
+        },
+        {
+          "name": "qwen_direct_generation",
+          "status": "completed",
+          "latency_ms": 5792,
+          "detail": "passed format checks"
+        }
+      ]
+    },
+    {
+      "profile": "qwen_direct:dense",
+      "id": "graph-004",
+      "query": "트랜스포머와 지식 그래프를 결합한 설계가 가능한가?",
+      "passed": false,
+      "accuracy": 0.6,
+      "term_coverage": 1.0,
+      "grounded_block_ratio": 1.0,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 1.0,
+        "recall_at_k": 1.0,
+        "mrr": 1.0
+      },
+      "latency_ms": 25374,
+      "intent": "DESIGN_PROPOSAL",
+      "expected_intent": "DESIGN_PROPOSAL",
+      "intent_correct": true,
+      "question_structure": "SYNTHESIS",
+      "expected_question_structure": "SYNTHESIS",
+      "structure_correct": true,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "hierarchical",
+      "routing_correct": false,
+      "coverage": "UNASSESSED",
+      "tags": [
+        "design",
+        "partial"
+      ],
+      "source_ids": [
+        7,
+        13,
+        12,
+        11
+      ],
+      "answer": "가능합니다. 트랜스포머의 어텐션 메커니즘과 지식 그래프의 구조적 관계 표현을 결합하면, 정보 검색 및 추론 효율성을 동시에 개선할 수 있습니다. 지식 그래프 기반 RAG(GraphRAG)가 노드와 엣지로 구성된 그래프 데이터베이스를 활용해 벡터 유사도 중심의 한계를 극복하고 있으며, [근거 2]는 메시지 패싱과 다중 홉 탐색을 통해 이질적 데이터 간 관계를 명확히 하는 방식으로 설명합니다 [근거 1]. 트랜스포머의 쿼리-키-값(QKV) 구조([근거 3])와 같은 유사도 계산 기법이 그래프 노드 간 관계 분석에 활용될 수 있습니다.",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 10209,
+          "detail": "DESIGN_PROPOSAL / SYNTHESIS; synthesis=True; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 18,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "qwen_direct: explicit evaluation override"
+        },
+        {
+          "name": "qwen_direct_generation",
+          "status": "completed",
+          "latency_ms": 15146,
+          "detail": "passed format checks"
+        }
+      ]
+    },
+    {
+      "profile": "qwen_direct:dense",
+      "id": "unknown-001",
+      "query": "양자 오류 정정에 surface code를 적용하는 절차는?",
+      "passed": false,
+      "accuracy": 0.3,
+      "term_coverage": 1.0,
+      "grounded_block_ratio": 1.0,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 39803,
+      "intent": "TROUBLESHOOTING",
+      "expected_intent": "FACT_LOOKUP",
+      "intent_correct": false,
+      "question_structure": "PROCEDURAL",
+      "expected_question_structure": "DIRECT_LOOKUP",
+      "structure_correct": false,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "qwen_direct",
+      "routing_correct": true,
+      "coverage": "UNASSESSED",
+      "tags": [
+        "unknown"
+      ],
+      "source_ids": [
+        12,
+        10,
+        9,
+        13
+      ],
+      "answer": "surface code는 노드와 엣지로 구성된 데이터 구조에서 메시지 패싱(Message Passing)을 통해 위상학적 정보를 전달하며, 이 과정에서 오류 발생 시 연결된 이웃 노드의 상태를 분석해 오류 위치를 추정합니다([근거 4]). 이를 위해 큐비트는 격자 형태로 배열되고, 각 큐비트는 주변 큐비트와 상호작용하며 오류를 감지하는 시스템을 구축해야 합니다.",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 10682,
+          "detail": "TROUBLESHOOTING / PROCEDURAL; synthesis=True; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 19,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "qwen_direct: explicit evaluation override"
+        },
+        {
+          "name": "qwen_direct_generation",
+          "status": "completed",
+          "latency_ms": 29101,
+          "detail": "passed format checks"
+        }
+      ]
+    },
+    {
+      "profile": "qwen_direct:dense",
+      "id": "unknown-002",
+      "query": "쿠버네티스에서 etcd 장애를 복구하는 명령어를 알려줘",
+      "passed": false,
+      "accuracy": 0.3,
+      "term_coverage": 1.0,
+      "grounded_block_ratio": 1.0,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 16770,
+      "intent": "TROUBLESHOOTING",
+      "expected_intent": "TROUBLESHOOTING",
+      "intent_correct": true,
+      "question_structure": "PROCEDURAL",
+      "expected_question_structure": "PROCEDURAL",
+      "structure_correct": true,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "hierarchical",
+      "routing_correct": false,
+      "coverage": "UNASSESSED",
+      "tags": [
+        "unknown"
+      ],
+      "source_ids": [
+        11,
+        12
+      ],
+      "answer": "[근거 1]과 [근거 2]는 인공신경망 아키텍처(예: LSTM, Transformer)의 수학적 메커니즘에 대한 내용으로, etcd 복구와 무관합니다.",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 9589,
+          "detail": "TROUBLESHOOTING / PROCEDURAL; synthesis=True; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 18,
+          "detail": "dense: 2 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "qwen_direct: explicit evaluation override"
+        },
+        {
+          "name": "qwen_direct_generation",
+          "status": "completed",
+          "latency_ms": 7163,
+          "detail": "passed format checks"
+        }
+      ]
+    },
+    {
+      "profile": "qwen_direct:dense",
+      "id": "unknown-003",
+      "query": "반도체 식각 장비의 RF reflected power 알람 원인은?",
+      "passed": false,
+      "accuracy": 0.3,
+      "term_coverage": 1.0,
+      "grounded_block_ratio": 1.0,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 20309,
+      "intent": "TROUBLESHOOTING",
+      "expected_intent": "TROUBLESHOOTING",
+      "intent_correct": true,
+      "question_structure": "PROCEDURAL",
+      "expected_question_structure": "PROCEDURAL",
+      "structure_correct": true,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "hierarchical",
+      "routing_correct": false,
+      "coverage": "UNASSESSED",
+      "tags": [
+        "unknown"
+      ],
+      "source_ids": [
+        9,
+        8,
+        14,
+        11
+      ],
+      "answer": "RF 신호가 전달되는 경로에서 발생하는 임피던스 차이(예: 장비의 반사 저항과 공급기 간 불일치)는 에너지가 반사되며, 이로 인해 알람이 트리거됩니다. [근거 4]에 언급된 순환 신경망(RNN)의 재귀적 은닉 상태 처리 방식처럼, RF 시스템에서도 전달 경로의 일관성과 매칭 상태가 핵심입니다.",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 9758,
+          "detail": "TROUBLESHOOTING / PROCEDURAL; synthesis=True; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 19,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "qwen_direct: explicit evaluation override"
+        },
+        {
+          "name": "qwen_direct_generation",
+          "status": "completed",
+          "latency_ms": 10532,
+          "detail": "passed format checks"
+        }
+      ]
+    },
+    {
+      "profile": "qwen_direct:dense",
+      "id": "unknown-004",
+      "query": "Rust borrow checker의 lifetime elision 규칙은?",
+      "passed": false,
+      "accuracy": 0.3,
+      "term_coverage": 1.0,
+      "grounded_block_ratio": 1.0,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 22433,
+      "intent": "FACT_LOOKUP",
+      "expected_intent": "FACT_LOOKUP",
+      "intent_correct": true,
+      "question_structure": "DIRECT_LOOKUP",
+      "expected_question_structure": "DIRECT_LOOKUP",
+      "structure_correct": true,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "qwen_direct",
+      "routing_correct": true,
+      "coverage": "UNASSESSED",
+      "tags": [
+        "unknown"
+      ],
+      "source_ids": [
+        11,
+        8
+      ],
+      "answer": "이 규칙은 함수 정의 시 명시적인 라이프타임 생략을 가능하게 하며, 컴파일러가 타입 검사를 수행할 때 자동으로 적용됩니다. 언급된 신경망의 입력/출력 처리 방식과 유사한 추론 원리가 반영되었습니다 [근거 2][근거 1].",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 8986,
+          "detail": "FACT_LOOKUP / DIRECT_LOOKUP; synthesis=False; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 19,
+          "detail": "dense: 2 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "qwen_direct: explicit evaluation override"
+        },
+        {
+          "name": "qwen_direct_generation",
+          "status": "completed",
+          "latency_ms": 13427,
+          "detail": "passed format checks"
+        }
+      ]
+    },
+    {
+      "profile": "qwen_direct:dense",
+      "id": "unknown-005",
+      "query": "Redis cluster의 hash slot 재분배 방법은?",
+      "passed": false,
+      "accuracy": 0.3,
+      "term_coverage": 1.0,
+      "grounded_block_ratio": 0.3333,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 21954,
+      "intent": "FACT_LOOKUP",
+      "expected_intent": "FACT_LOOKUP",
+      "intent_correct": true,
+      "question_structure": "DIRECT_LOOKUP",
+      "expected_question_structure": "DIRECT_LOOKUP",
+      "structure_correct": true,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "qwen_direct",
+      "routing_correct": true,
+      "coverage": "PARTIAL",
+      "tags": [
+        "unknown"
+      ],
+      "source_ids": [
+        10,
+        11,
+        4,
+        14
+      ],
+      "answer": "현재 근거만으로 확인하기 어려운 항목: 선택된 원문을 가리키는 유효한 인용이 없습니다.\n\n최종 답변의 형식을 안정적으로 생성하지 못해, 확인 가능한 원문 범위만 제공합니다.\n\n- • 생성자(G): 판별자가 자신의 가짜 데이터를 1로 착각하게 만들도록 손실을 최소화(Min)하려 합니다. 이 두 네트워크가 수식 안에서 서로를 속이고 잡아내기 위해 끊임없이 역전파를 수행하며, 최종적으로 판별자의 확률이 0.5(진짜인지 가짜인지 완벽히 헷갈림)에 도달하는 내쉬 균형(Nash Equilibrium)을 목표로 합니다. 3. [근거 1]\n- LSTM은 이를 내부의 \"셀 상태(Cell State)\"라는 직통 컨베이어 벨트를 깔아 해결했습니다. • 망각 게이트 (Forget Gate): 과거의 정보 중 쓸모없는 것을 얼마나 버릴지 시그모이드 함수(0~1)로 곱해 결정합니다. • 입력 게이트 (Input Gate): 현재 들어온 새로운 정보 중 얼마만큼을 셀 상태에 추가할지 수학적으로 조절합니다. [근거 2]\n- 알고리즘 명칭 수학적 기반 및 상세 작동 원리 선형 및 로지스틱 회귀 (Regression) 데이터의 오차 분산이 가장 적은 최적의 1차 함수(추세선)를 한 번에 계산합니다. 로지스틱 회귀는 이 수식에 시그모이드(Sigmoid) 함수를 씌워 결과값을 0~1 사이의 확률로 변환, 이진 분류를 수행합니다. [근거 3]\n- 1세대: 선형 모델과 확률적 기초 (선형 결정 경계) 핵심 알고리즘: 로지스틱 회귀(Logistic Regression), 선형 회귀 수학적 원리: 단일 수식으로 변수 간의 독립적인 관계를 계산합니다. 특히 로지스틱 회귀는 출력값을 시그모이드 함수에 통과시켜 0과 1 사이의 '확률값'을 반환합니다. [근거 4]",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 11311,
+          "detail": "FACT_LOOKUP / DIRECT_LOOKUP; synthesis=False; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 22,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "qwen_direct: explicit evaluation override"
+        },
+        {
+          "name": "qwen_direct_generation",
+          "status": "completed",
+          "latency_ms": 10621,
+          "detail": "선택된 원문을 가리키는 유효한 인용이 없습니다."
+        }
+      ]
+    },
+    {
+      "profile": "qwen_direct:dense",
+      "id": "policy-002",
+      "query": "이거 왜 그래?",
+      "passed": false,
+      "accuracy": 0.7,
+      "term_coverage": 0.0,
+      "grounded_block_ratio": 0.0,
+      "citation_validity": 1.0,
+      "behavior_correct": true,
+      "retrieval": {
+        "hit_at_k": 1.0,
+        "recall_at_k": 1.0,
+        "mrr": 1.0
+      },
+      "latency_ms": 10285,
+      "intent": "CAUSE_ANALYSIS",
+      "expected_intent": "FACT_LOOKUP",
+      "intent_correct": false,
+      "question_structure": "CAUSAL",
+      "expected_question_structure": "DIRECT_LOOKUP",
+      "structure_correct": false,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "bypass",
+      "routing_correct": false,
+      "coverage": "NEEDS_CLARIFICATION",
+      "tags": [
+        "clarification"
+      ],
+      "source_ids": [],
+      "answer": "'이거'이 어떤 기술이나 내용을 가리키는지 알려주시겠어요? 대상의 이름을 함께 적어주시면 정확히 찾아볼게요.",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 10285,
+          "detail": "CAUSE_ANALYSIS / CAUSAL; synthesis=True; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "clarification"
+        }
+      ]
+    },
+    {
+      "profile": "qwen_direct:dense",
+      "id": "policy-003",
+      "query": "새 모델을 설계해줘",
+      "passed": false,
+      "accuracy": 0.15,
+      "term_coverage": 0.5,
+      "grounded_block_ratio": 0.3333,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 27380,
+      "intent": "DESIGN_PROPOSAL",
+      "expected_intent": "DESIGN_PROPOSAL",
+      "intent_correct": true,
+      "question_structure": "SYNTHESIS",
+      "expected_question_structure": "SYNTHESIS",
+      "structure_correct": true,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "bypass",
+      "routing_correct": false,
+      "coverage": "PARTIAL",
+      "tags": [
+        "clarification"
+      ],
+      "source_ids": [
+        7,
+        3,
+        13,
+        15
+      ],
+      "answer": "현재 근거만으로 확인하기 어려운 항목: 선택된 원문을 가리키는 유효한 인용이 없습니다.\n\n최종 답변의 형식을 안정적으로 생성하지 못해, 확인 가능한 원문 범위만 제공합니다.\n\n- 1차 예측 결과를 도출한 뒤 최종 메타 분류기(Meta-classifier)를 통해 종합 판단을 내립니다. 특정 센서에 노이즈나 고장이 발생해도 전체 스크리닝 플랫폼의 강건성(Robustness)이 유지되는 탁월한 장점이 있습니다. [근거 1]\n- 하드코딩의 한계 돌파: 디지털 헬스케어나 복합 센서 시스템에서 수십만 가지 예외 변수를 인간이 일일이 코드로 짜는 것은 물리적으로 불가능합니다. 데이터만 주면 기계가 스스로 조건문(가중치)을 형성하게 만듭니다. 2. 비선형 패턴 발견: 인간의 인지 능력을 넘어서는 다차원 공간에 흩어진 데이터들 사이에서 숨겨진 곡선의 상관관계와 결정 경계선을 찾아냅니다. [근거 2]\n- 수학적으로 이는 개별 모델의 예측 분포에 가중치를 두어 결합하는 앙상블(Ensemble) 최적화 과정입니다. 어느 한쪽 센서(예: IMU)에 결측치나 심한 노이즈가 발생하더라도 다른 채널(예: 시각 이미지)의 확신도가 높으면 전체 시스템이 무너지지 않는 압도적인 강건성(Robustness)을 확보하게 됩니다. 2. [근거 3]\n- 이 서포트 벡터들과 구분선 사이의 빈 공간을 \"마진(Margin)\"이라고 하며, SVM의 유일한 수학적 목표는 이 마진을 \"최대화(Maximize)\"하여 가장 안전하고 넉넉한 결정 경계를 긋는 것입니다. 2. [근거 4]",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 10142,
+          "detail": "DESIGN_PROPOSAL / SYNTHESIS; synthesis=True; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 19,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "qwen_direct: explicit evaluation override"
+        },
+        {
+          "name": "qwen_direct_generation",
+          "status": "completed",
+          "latency_ms": 17218,
+          "detail": "선택된 원문을 가리키는 유효한 인용이 없습니다."
+        }
+      ]
+    },
+    {
+      "profile": "hierarchical:dense",
+      "id": "generative-003",
+      "query": "GAN의 생성자와 판별자는 각각 어떤 목표를 가지는가?",
+      "passed": false,
+      "accuracy": 0.225,
+      "term_coverage": 0.75,
+      "grounded_block_ratio": 0.5,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 18899,
+      "intent": "FACT_LOOKUP",
+      "expected_intent": "COMPARISON",
+      "intent_correct": false,
+      "question_structure": "DIRECT_LOOKUP",
+      "expected_question_structure": "COMPARATIVE",
+      "structure_correct": false,
+      "generation_mode": "hierarchical",
+      "expected_generation_mode": "hierarchical",
+      "routing_correct": true,
+      "coverage": "PARTIAL",
+      "tags": [
+        "comparison"
+      ],
+      "source_ids": [],
+      "answer": "현재 저장된 근거만으로는 질문에 답하기 어렵습니다.\n\n확인되지 않은 항목:\n- GAN 생성자의 목표\n- GAN 판별자의 목표\n- 질문의 핵심 사실을 직접 뒷받침하는 근거",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 11667,
+          "detail": "FACT_LOOKUP / DIRECT_LOOKUP; synthesis=False; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 21,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "hierarchical: explicit evaluation override"
+        },
+        {
+          "name": "evidence_structuring",
+          "status": "completed",
+          "latency_ms": 7210,
+          "detail": "PARTIAL: 0/4 selected"
+        }
+      ]
+    },
+    {
+      "profile": "hierarchical:dense",
+      "id": "policy-002",
+      "query": "이거 왜 그래?",
+      "passed": false,
+      "accuracy": 0.7,
+      "term_coverage": 0.0,
+      "grounded_block_ratio": 0.0,
+      "citation_validity": 1.0,
+      "behavior_correct": true,
+      "retrieval": {
+        "hit_at_k": 1.0,
+        "recall_at_k": 1.0,
+        "mrr": 1.0
+      },
+      "latency_ms": 10568,
+      "intent": "CAUSE_ANALYSIS",
+      "expected_intent": "FACT_LOOKUP",
+      "intent_correct": false,
+      "question_structure": "CAUSAL",
+      "expected_question_structure": "DIRECT_LOOKUP",
+      "structure_correct": false,
+      "generation_mode": "hierarchical",
+      "expected_generation_mode": "bypass",
+      "routing_correct": false,
+      "coverage": "NEEDS_CLARIFICATION",
+      "tags": [
+        "clarification"
+      ],
+      "source_ids": [],
+      "answer": "'이거'이 어떤 기술이나 내용을 가리키는지 알려주시겠어요? 대상의 이름을 함께 적어주시면 정확히 찾아볼게요.",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 10568,
+          "detail": "CAUSE_ANALYSIS / CAUSAL; synthesis=True; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "clarification"
+        }
+      ]
+    },
+    {
+      "profile": "hierarchical:dense",
+      "id": "policy-003",
+      "query": "새 모델을 설계해줘",
+      "passed": false,
+      "accuracy": 0.15,
+      "term_coverage": 0.5,
+      "grounded_block_ratio": 1.0,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 45562,
+      "intent": "DESIGN_PROPOSAL",
+      "expected_intent": "DESIGN_PROPOSAL",
+      "intent_correct": true,
+      "question_structure": "SYNTHESIS",
+      "expected_question_structure": "SYNTHESIS",
+      "structure_correct": true,
+      "generation_mode": "hierarchical",
+      "expected_generation_mode": "bypass",
+      "routing_correct": false,
+      "coverage": "COMPLETE",
+      "tags": [
+        "clarification"
+      ],
+      "source_ids": [
+        7,
+        3,
+        13
+      ],
+      "answer": "모델의 복잡한 예외 변수 처리를 위해 하드코딩 방식 대신 데이터를 활용하는 것이 필수적입니다. 디지털 헬스케어와 같은 복합 센서 시스템에서 수십만 가지에 달하는 예외 상황을 사람이 일일이 코드로 정의하는 것은 불가능하므로, 데이터 자체를 기반으로 기계가 스스로 조건문(가중치)을 형성하도록 설계해야 합니다 [근거 2].\n\n모델은 단순히 데이터를 분류하는 것을 넘어, 인간의 인지 능력을 초월하는 다차원 공간에 숨겨진 비선형적 상관관계와 결정 경계선을 찾아내는 방식으로 학습되어야 합니다 [근거 2]. 또한, 여러 센서 채널(예: IMU, 시각 이미지)을 결합할 때 개별 모델의 예측 분포를 수학적으로 가중치 부여하여 최적화하는 '앙상블 최적화' 과정을 거쳐 시스템 전체의 신뢰도를 높일 수 있습니다 [근거 3].",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 10241,
+          "detail": "DESIGN_PROPOSAL / SYNTHESIS; synthesis=True; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 19,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "hierarchical: explicit evaluation override"
+        },
+        {
+          "name": "evidence_structuring",
+          "status": "completed",
+          "latency_ms": 13399,
+          "detail": "COMPLETE: 3/4 selected"
+        },
+        {
+          "name": "gemma_generation_and_validation",
+          "status": "completed",
+          "latency_ms": 21902,
+          "detail": "passed; 0 retry issue(s)"
+        }
+      ]
+    },
+    {
+      "profile": "auto:dense",
+      "id": "backprop-004",
+      "query": "역전파를 사용하지 않는 학습 방식에는 무엇이 있는가?",
+      "passed": false,
+      "accuracy": 0.7,
+      "term_coverage": 0.0,
+      "grounded_block_ratio": 1.0,
+      "citation_validity": 1.0,
+      "behavior_correct": true,
+      "retrieval": {
+        "hit_at_k": 1.0,
+        "recall_at_k": 1.0,
+        "mrr": 1.0
+      },
+      "latency_ms": 22680,
+      "intent": "FACT_LOOKUP",
+      "expected_intent": "FACT_LOOKUP",
+      "intent_correct": true,
+      "question_structure": "DIRECT_LOOKUP",
+      "expected_question_structure": "DIRECT_LOOKUP",
+      "structure_correct": true,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "qwen_direct",
+      "routing_correct": true,
+      "coverage": "UNASSESSED",
+      "tags": [
+        "fact"
+      ],
+      "source_ids": [
+        6,
+        8,
+        4,
+        7
+      ],
+      "answer": "- **힙의 법칙**은 미분 계산 없이 입력과 출력이 동시에 강할 때 가중치를 직접 강화하는 생물학적 원리를 기반으로 합니다([근거 1]).  \n- **전통적 머신러닝**은 신경망 구조를 모방하지 않고, 통계학·확률·기하학적 거리 등을 도구로 사용해 데이터를 분류합니다([근거 3]).  \n- **대조 학습**은 정답 라벨 없이 특징을 학습하는 자기지도학습 기법으로, 역전파가 필요하지 않습니다([근거 4]).",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 11636,
+          "detail": "FACT_LOOKUP / DIRECT_LOOKUP; synthesis=False; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 27,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "qwen_direct: structure DIRECT_LOOKUP; direct evidence lookup"
+        },
+        {
+          "name": "qwen_direct_generation",
+          "status": "completed",
+          "latency_ms": 11015,
+          "detail": "passed format checks"
+        }
+      ]
+    },
+    {
+      "profile": "auto:dense",
+      "id": "generative-002",
+      "query": "VAE에서 재매개변수화 트릭이 필요한 이유는?",
+      "passed": false,
+      "accuracy": 0.2,
+      "term_coverage": 0.6667,
+      "grounded_block_ratio": 0.5,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 21656,
+      "intent": "CAUSE_ANALYSIS",
+      "expected_intent": "CAUSE_ANALYSIS",
+      "intent_correct": true,
+      "question_structure": "CAUSAL",
+      "expected_question_structure": "CAUSAL",
+      "structure_correct": true,
+      "generation_mode": "hierarchical",
+      "expected_generation_mode": "hierarchical",
+      "routing_correct": true,
+      "coverage": "PARTIAL",
+      "tags": [
+        "cause"
+      ],
+      "source_ids": [],
+      "answer": "현재 저장된 근거만으로는 질문에 답하기 어렵습니다.\n\n확인되지 않은 항목:\n- 재매개변수화 트릭의 필요성에 대한 원문 직접 언급 부족\n- VAE에서 샘플링 과정의 미분 가능성 문제 설명 누락\n- 직접적인 원인\n- 원인과 결과가 연결되는 과정",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 11725,
+          "detail": "CAUSE_ANALYSIS / CAUSAL; synthesis=True; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 21,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "hierarchical: structure CAUSAL; evidence synthesis required"
+        },
+        {
+          "name": "evidence_structuring",
+          "status": "completed",
+          "latency_ms": 9908,
+          "detail": "PARTIAL: 0/4 selected"
+        }
+      ]
+    },
+    {
+      "profile": "auto:dense",
+      "id": "unknown-004",
+      "query": "Rust borrow checker의 lifetime elision 규칙은?",
+      "passed": false,
+      "accuracy": 0.3,
+      "term_coverage": 1.0,
+      "grounded_block_ratio": 0.3333,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 23202,
+      "intent": "FACT_LOOKUP",
+      "expected_intent": "FACT_LOOKUP",
+      "intent_correct": true,
+      "question_structure": "DIRECT_LOOKUP",
+      "expected_question_structure": "DIRECT_LOOKUP",
+      "structure_correct": true,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "qwen_direct",
+      "routing_correct": true,
+      "coverage": "PARTIAL",
+      "tags": [
+        "unknown"
+      ],
+      "source_ids": [
+        11,
+        8
+      ],
+      "answer": "현재 근거만으로 확인하기 어려운 항목: 선택된 원문을 가리키는 유효한 인용이 없습니다.\n\n최종 답변의 형식을 안정적으로 생성하지 못해, 확인 가능한 원문 범위만 제공합니다.\n\n- LSTM은 이를 내부의 \"셀 상태(Cell State)\"라는 직통 컨베이어 벨트를 깔아 해결했습니다. • 망각 게이트 (Forget Gate): 과거의 정보 중 쓸모없는 것을 얼마나 버릴지 시그모이드 함수(0~1)로 곱해 결정합니다. • 입력 게이트 (Input Gate): 현재 들어온 새로운 정보 중 얼마만큼을 셀 상태에 추가할지 수학적으로 조절합니다. [근거 1]\n- 여러 개의 입력 신호(x)가 들어올 때, 각 신호는 0(비활성) 또는 1(활성)의 값만 가집니다. 이 신호들의 총합이 미리 설정해 둔 임계값(Threshold)을 넘으면 최종 출력으로 1을 내뱉고, 넘지 못하면 0을 내뱉습니다. [근거 2]",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 9037,
+          "detail": "FACT_LOOKUP / DIRECT_LOOKUP; synthesis=False; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 18,
+          "detail": "dense: 2 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "qwen_direct: structure DIRECT_LOOKUP; direct evidence lookup"
+        },
+        {
+          "name": "qwen_direct_generation",
+          "status": "completed",
+          "latency_ms": 14146,
+          "detail": "선택된 원문을 가리키는 유효한 인용이 없습니다."
+        }
+      ]
+    },
+    {
+      "profile": "auto:dense",
+      "id": "unknown-005",
+      "query": "Redis cluster의 hash slot 재분배 방법은?",
+      "passed": false,
+      "accuracy": 0.3,
+      "term_coverage": 1.0,
+      "grounded_block_ratio": 1.0,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 17159,
+      "intent": "FACT_LOOKUP",
+      "expected_intent": "FACT_LOOKUP",
+      "intent_correct": true,
+      "question_structure": "DIRECT_LOOKUP",
+      "expected_question_structure": "DIRECT_LOOKUP",
+      "structure_correct": true,
+      "generation_mode": "qwen_direct",
+      "expected_generation_mode": "qwen_direct",
+      "routing_correct": true,
+      "coverage": "UNASSESSED",
+      "tags": [
+        "unknown"
+      ],
+      "source_ids": [
+        10,
+        11,
+        4,
+        14
+      ],
+      "answer": "Redis Cluster의 해시 슬롯 재분배는 노드 추가/삭제 시 해당 슬롯을 다른 노드로 이동시키는 메커니즘입니다. [근거 1]~[근거 4]는 머신러닝 모델과 관련된 내용으로, Redis Cluster에 대한 설명은 포함되지 않았습니다. 제공된 자료에서 해시 슬롯 재분배 방법이나 관리 방식에 대한 정보는 없습니다. 정확한 기술적 사항은 Redis 공식 문서나 클러스터 운영 가이드를 참고해야 합니다.",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 11399,
+          "detail": "FACT_LOOKUP / DIRECT_LOOKUP; synthesis=False; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 20,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "qwen_direct: structure DIRECT_LOOKUP; direct evidence lookup"
+        },
+        {
+          "name": "qwen_direct_generation",
+          "status": "completed",
+          "latency_ms": 5740,
+          "detail": "passed format checks"
+        }
+      ]
+    },
+    {
+      "profile": "auto:dense",
+      "id": "policy-002",
+      "query": "이거 왜 그래?",
+      "passed": false,
+      "accuracy": 0.7,
+      "term_coverage": 0.0,
+      "grounded_block_ratio": 0.0,
+      "citation_validity": 1.0,
+      "behavior_correct": true,
+      "retrieval": {
+        "hit_at_k": 1.0,
+        "recall_at_k": 1.0,
+        "mrr": 1.0
+      },
+      "latency_ms": 10783,
+      "intent": "CAUSE_ANALYSIS",
+      "expected_intent": "FACT_LOOKUP",
+      "intent_correct": false,
+      "question_structure": "CAUSAL",
+      "expected_question_structure": "DIRECT_LOOKUP",
+      "structure_correct": false,
+      "generation_mode": "auto",
+      "expected_generation_mode": "bypass",
+      "routing_correct": true,
+      "coverage": "NEEDS_CLARIFICATION",
+      "tags": [
+        "clarification"
+      ],
+      "source_ids": [],
+      "answer": "'이거'이 어떤 기술이나 내용을 가리키는지 알려주시겠어요? 대상의 이름을 함께 적어주시면 정확히 찾아볼게요.",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 10783,
+          "detail": "CAUSE_ANALYSIS / CAUSAL; synthesis=True; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "clarification"
+        }
+      ]
+    },
+    {
+      "profile": "auto:dense",
+      "id": "policy-003",
+      "query": "새 모델을 설계해줘",
+      "passed": false,
+      "accuracy": 0.0,
+      "term_coverage": 0.0,
+      "grounded_block_ratio": 1.0,
+      "citation_validity": 1.0,
+      "behavior_correct": false,
+      "retrieval": {
+        "hit_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "mrr": 0.0
+      },
+      "latency_ms": 45810,
+      "intent": "DESIGN_PROPOSAL",
+      "expected_intent": "DESIGN_PROPOSAL",
+      "intent_correct": true,
+      "question_structure": "SYNTHESIS",
+      "expected_question_structure": "SYNTHESIS",
+      "structure_correct": true,
+      "generation_mode": "hierarchical",
+      "expected_generation_mode": "bypass",
+      "routing_correct": false,
+      "coverage": "COMPLETE",
+      "tags": [
+        "clarification"
+      ],
+      "source_ids": [
+        7,
+        13
+      ],
+      "answer": "모델의 입력 단계에서는 여러 센서(예: IMU, 시각 이미지 등)에서 얻은 개별 예측 분포를 결합하는 앙상블 최적화 과정을 거칩니다. 이 과정은 각 모델의 예측에 가중치를 두어 종합적으로 결합하며, 특정 채널이나 센서가 결측치나 심한 노이즈를 포함하더라도 다른 확신도가 높은 채널의 정보로 전체 시스템의 안정성을 확보할 수 있습니다 [근거 3].\n\n앙상블 최적화 과정을 거쳐 도출된 여러 예측 결과들을 하나의 입력으로 받아, 이를 종합적으로 판단하는 메타 분류기(Meta-classifier)를 통해 최종적인 결론을 내립니다 [근거 1]. 이 구조는 개별 모델의 한계를 보완하고 전체 스크리닝 플랫폼의 강건성을 높이는 역할을 합니다 [근거 1].",
+      "trace": [
+        {
+          "name": "question_planning",
+          "status": "completed",
+          "latency_ms": 10312,
+          "detail": "DESIGN_PROPOSAL / SYNTHESIS; synthesis=True; judgment=False"
+        },
+        {
+          "name": "information_sufficiency",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "sufficient"
+        },
+        {
+          "name": "retrieval",
+          "status": "completed",
+          "latency_ms": 21,
+          "detail": "dense: 4 candidates"
+        },
+        {
+          "name": "generation_routing",
+          "status": "completed",
+          "latency_ms": 0,
+          "detail": "hierarchical: structure SYNTHESIS; evidence synthesis required"
+        },
+        {
+          "name": "evidence_structuring",
+          "status": "completed",
+          "latency_ms": 15880,
+          "detail": "COMPLETE: 2/4 selected"
+        },
+        {
+          "name": "gemma_generation_and_validation",
+          "status": "completed",
+          "latency_ms": 19595,
+          "detail": "passed; 0 retry issue(s)"
+        }
+      ]
+    }
+  ]
 }
