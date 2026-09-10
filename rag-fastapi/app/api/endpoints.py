@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.models.schemas import IndexRequest, IndexResponse, QueryRequest, QueryResponse, ClassifyRequest, ClassifyResponse, DraftRequest, DraftResponse
+from app.models.schemas import IndexRequest, IndexResponse, QueryRequest, QueryResponse, ClassifyRequest, ClassifyResponse, DraftRequest, DraftResponse, LearningDirectionRequest, LearningDirectionResponse
 from app.services.rag_service import rag_service
 from app.services.evaluation_report import evaluation_report_service
 
@@ -49,6 +49,16 @@ def classify_post(request: ClassifyRequest):
 def generate_post_draft(request: DraftRequest):
     try:
         return rag_service.generate_post_draft(request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post('/learning-directions', response_model=LearningDirectionResponse)
+def recommend_learning_directions(request: LearningDirectionRequest):
+    try:
+        return rag_service.recommend_learning_directions(request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

@@ -24,7 +24,27 @@ services:
     networks:
       - app-network
 
-  # 3. AI / RAG 서빙 엔진 (FastAPI + BGE-M3 + LM Studio 연동)
+  # 3. API 키 없이 사용하는 내부 전용 메타 검색 엔진
+  web-search:
+    image: docker.io/searxng/searxng:latest
+    container_name: knowledge_web_search
+    restart: always
+    environment:
+      FORCE_OWNERSHIP: "false"
+      SEARXNG_PORT: 8080
+    volumes:
+      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - searxng_cache:/var/cache/searxng
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    networks:
+      - app-network
+
+  # 4. AI / RAG 서빙 엔진 (FastAPI + BGE-M3 + LM Studio 연동)
   rag-fastapi:
     build:
       context: ./rag-fastapi
@@ -44,6 +64,11 @@ services:
       ANSWER_MODEL: ${ANSWER_MODEL:?ANSWER_MODEL is required}
       RERANKER_MODEL_NAME: ${RERANKER_MODEL_NAME:-BAAI/bge-reranker-v2-m3}
       MIN_SEARCH_SCORE: ${MIN_SEARCH_SCORE:?MIN_SEARCH_SCORE is required}
+      SEARXNG_URL: http://web-search:8080
+      WEB_SEARCH_TIMEOUT_SECONDS: ${WEB_SEARCH_TIMEOUT_SECONDS:-8}
+      WEB_SEARCH_MAX_RESULTS: ${WEB_SEARCH_MAX_RESULTS:-5}
+      REINDEX_POSTS_URL: http://backend-spring:${BACKEND_INTERNAL_PORT:?BACKEND_INTERNAL_PORT is required}/api/posts
+      REINDEX_INDEX_URL: http://localhost:${RAG_INTERNAL_PORT:?RAG_INTERNAL_PORT is required}/api/rag/index
     command: ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port $$RAG_INTERNAL_PORT"]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:$$RAG_INTERNAL_PORT/api/rag/health || exit 1"]
@@ -54,7 +79,10 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      - vector-db
+      vector-db:
+        condition: service_started
+      web-search:
+        condition: service_healthy
     volumes:
       - hf_cache:/root/.cache/huggingface
       - ./rag-fastapi/evaluation/results:/app/evaluation/results
@@ -62,7 +90,7 @@ services:
     networks:
       - app-network
 
-  # 4. 메인 비즈니스 백엔드 (Java 17 + Spring Boot + MyBatis)
+  # 5. 메인 비즈니스 백엔드 (Java 17 + Spring Boot + MyBatis)
   backend-spring:
     build:
       context: ./backend-spring
@@ -94,7 +122,7 @@ services:
     networks:
       - app-network
 
-  # 5. 블로그 웹 프론트엔드 (Next.js)
+  # 6. 블로그 웹 프론트엔드 (Next.js)
   frontend-blog:
     build:
       context: ./frontend-nextjs
@@ -122,3 +150,4 @@ volumes:
   qdrant_data:
   blog_uploads:
   hf_cache:
+  searxng_cache:

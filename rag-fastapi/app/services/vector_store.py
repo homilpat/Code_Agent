@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 from app.config import settings
+from app.models.schemas import AccessScope
 
 logger = logging.getLogger(__name__)
 
@@ -59,14 +60,88 @@ class VectorStoreService:
             wait=True,
         )
 
-    def search(self, query_vector: List[float], limit: int = 4, domain_filter: Optional[str] = None) -> List[Any]:
-        query_filter = None
+    @staticmethod
+    def _query_filter(
+        domain_filter: Optional[str],
+        access_scope: Optional[AccessScope],
+        source_types: Optional[List[str]],
+        excluded_sources: Optional[List[tuple[str, int]]],
+    ) -> Optional[qmodels.Filter]:
+        must = []
+        must_not = []
         if domain_filter and domain_filter != 'ALL':
-            query_filter = qmodels.Filter(
-                must=[
-                    qmodels.FieldCondition(key='category_section', match=qmodels.MatchValue(value=domain_filter))
-                ]
-            )
+            must.append(qmodels.FieldCondition(
+                key='category_section',
+                match=qmodels.MatchValue(value=domain_filter),
+            ))
+        if source_types:
+            must.append(qmodels.FieldCondition(
+                key='source_type',
+                match=qmodels.MatchAny(any=source_types),
+            ))
+
+        scope = access_scope or AccessScope()
+        if not scope.is_admin:
+            allowed = [qmodels.FieldCondition(
+                key='visibility',
+                match=qmodels.MatchValue(value='PUBLIC'),
+            )]
+            if scope.user_id is not None:
+                allowed.extend([
+                    qmodels.FieldCondition(
+                        key='owner_id',
+                        match=qmodels.MatchValue(value=scope.user_id),
+                    ),
+                    qmodels.FieldCondition(
+                        key='allowed_user_ids',
+                        match=qmodels.MatchAny(any=[scope.user_id]),
+                    ),
+                ])
+            if scope.organization_ids:
+                allowed.append(qmodels.Filter(must=[
+                    qmodels.FieldCondition(
+                        key='visibility',
+                        match=qmodels.MatchValue(value='ORGANIZATION'),
+                    ),
+                    qmodels.FieldCondition(
+                        key='organization_id',
+                        match=qmodels.MatchAny(any=scope.organization_ids),
+                    ),
+                ]))
+            if scope.roles:
+                allowed.append(qmodels.FieldCondition(
+                    key='allowed_roles',
+                    match=qmodels.MatchAny(any=scope.roles),
+                ))
+            must.append(qmodels.Filter(should=allowed))
+
+        for source_type, source_id in excluded_sources or []:
+            must_not.append(qmodels.Filter(must=[
+                qmodels.FieldCondition(
+                    key='source_type',
+                    match=qmodels.MatchValue(value=source_type),
+                ),
+                qmodels.FieldCondition(
+                    key='source_id',
+                    match=qmodels.MatchValue(value=source_id),
+                ),
+            ]))
+        if not must and not must_not:
+            return None
+        return qmodels.Filter(must=must, must_not=must_not)
+
+    def search(
+        self,
+        query_vector: List[float],
+        limit: int = 4,
+        domain_filter: Optional[str] = None,
+        access_scope: Optional[AccessScope] = None,
+        source_types: Optional[List[str]] = None,
+        excluded_sources: Optional[List[tuple[str, int]]] = None,
+    ) -> List[Any]:
+        query_filter = self._query_filter(
+            domain_filter, access_scope, source_types, excluded_sources
+        )
         try:
             result = self.client.query_points(
                 collection_name=settings.QDRANT_COLLECTION,
@@ -83,15 +158,13 @@ class VectorStoreService:
         self,
         limit: int = 1000,
         domain_filter: Optional[str] = None,
+        access_scope: Optional[AccessScope] = None,
+        source_types: Optional[List[str]] = None,
+        excluded_sources: Optional[List[tuple[str, int]]] = None,
     ) -> List[Any]:
-        query_filter = None
-        if domain_filter and domain_filter != 'ALL':
-            query_filter = qmodels.Filter(
-                must=[qmodels.FieldCondition(
-                    key='category_section',
-                    match=qmodels.MatchValue(value=domain_filter),
-                )]
-            )
+        query_filter = self._query_filter(
+            domain_filter, access_scope, source_types, excluded_sources
+        )
         try:
             points, _ = self.client.scroll(
                 collection_name=settings.QDRANT_COLLECTION,

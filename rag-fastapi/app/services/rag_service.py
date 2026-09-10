@@ -4,18 +4,26 @@ import re
 import math
 import json
 import html
+import hashlib
 from typing import List, Dict
 from app.config import settings
-from app.models.schemas import IndexRequest, IndexResponse, QueryRequest, QueryResponse, TraceStep, ClassifyRequest, ClassifyResponse, DraftRequest, DraftResponse
+from app.models.schemas import IndexRequest, IndexResponse, QueryRequest, QueryResponse, SourceItem, TraceStep, ClassifyRequest, ClassifyResponse, DraftRequest, DraftResponse, LearningDirectionRequest, LearningDirectionResponse
 from app.services.generation_router import generation_router
 from app.services.answer_renderer import answer_renderer
 from app.services.claim_judge import claim_judge
-from app.services.evidence_retriever import EvidenceRetriever
+from app.services.evidence_retriever import EvidenceBundle, EvidenceRetriever
 from app.services.evidence_structurer import evidence_structurer
+from app.services.fallback_response import (
+    generation_unavailable_message,
+    partial_evidence_message,
+)
 from app.services.information_sufficiency import information_sufficiency_judge
+from app.services.indexing_policy import embedding_document_text
+from app.services.learning_recommender import LearningRecommender
 from app.services.novelty_judge import novelty_judge
 from app.services.query_planner import query_planner
 from app.services.vector_store import vector_store
+from app.services.web_search import web_search_service
 
 logger = logging.getLogger(__name__)
 
@@ -312,7 +320,9 @@ class RAGService:
         vectors = []
         payloads = []
         for i, chunk in enumerate(chunks):
-            vec = self._get_embedding(chunk)
+            # The title carries the document's identity and often matches direct
+            # definition questions more precisely than an isolated body chunk.
+            vec = self._get_embedding(embedding_document_text(req.title, chunk))
             payload = {
                 "source_type": req.source_type,
                 "source_id": req.source_id,
@@ -320,6 +330,11 @@ class RAGService:
                 "category_section": req.category,
                 "tags": req.tags,
                 "url": req.url or ('/posts/' + str(req.source_id) if req.source_type == 'POST' else None),
+                "visibility": req.visibility,
+                "owner_id": req.owner_id,
+                "organization_id": req.organization_id,
+                "allowed_user_ids": req.allowed_user_ids,
+                "allowed_roles": req.allowed_roles,
                 "chunk_index": i,
                 "chunk_length": len(chunk),
                 "content": chunk
@@ -339,6 +354,14 @@ class RAGService:
     def delete_source(self, source_type: str, source_id: int) -> None:
         vector_store.delete_by_source(source_type, source_id)
 
+    def recommend_learning_directions(
+        self, req: LearningDirectionRequest
+    ) -> LearningDirectionResponse:
+        return LearningRecommender(
+            llm_client=self.llm_client,
+            evidence_retriever=self.evidence_retriever,
+        ).recommend(req)
+
     def retrieve_for_evaluation(self, req: QueryRequest) -> dict:
         start_time = time.time()
         plan = query_planner._fallback_plan(req.query)
@@ -355,6 +378,7 @@ class RAGService:
             top_k=req.top_k,
             domain_filter=req.domain_filter,
             retrieval_mode=req.retrieval_mode,
+            access_scope=req.access_scope,
         )
         return {
             "query": req.query,
@@ -363,6 +387,38 @@ class RAGService:
             "retrieval_mode": req.retrieval_mode,
             "latency_ms": int((time.time() - start_time) * 1000),
         }
+
+    @staticmethod
+    def _web_evidence(search_query: str, top_k: int) -> EvidenceBundle:
+        web_results = web_search_service.search(search_query, limit=top_k)
+        sources = []
+        context_chunks = []
+        for citation_number, result in enumerate(web_results, start=1):
+            source_id = int(hashlib.sha256(result.url.encode("utf-8")).hexdigest()[:12], 16)
+            sources.append(SourceItem(
+                source_type="WEB",
+                source_id=source_id,
+                title=result.title,
+                category="WEB",
+                url=result.url,
+                snippet=result.snippet,
+                score=result.score,
+                citation_number=citation_number,
+                publisher=result.publisher,
+                checked_at=result.checked_at,
+            ))
+            context_chunks.append(
+                f"[근거 {citation_number}]\n"
+                f"제목: {result.title}\n"
+                f"발행처: {result.publisher}\n"
+                f"확인 날짜: {result.checked_at}\n"
+                f"링크: {result.url}\n"
+                f"검색 결과 요약: {result.snippet}"
+            )
+        return EvidenceBundle(
+            sources=sources,
+            context_text="\n\n".join(context_chunks),
+        )
 
     def answer_query(self, req: QueryRequest) -> QueryResponse:
         start_time = time.time()
@@ -444,13 +500,38 @@ class RAGService:
             top_k=req.top_k,
             domain_filter=req.domain_filter,
             retrieval_mode=req.retrieval_mode,
+            access_scope=req.access_scope,
         )
         trace.append(TraceStep(
             name="retrieval",
             latency_ms=int((time.time() - stage_start) * 1000),
             detail=f"{req.retrieval_mode}: {len(evidence.sources)} candidates",
         ))
+        retrieval_mode = req.retrieval_mode
+        web_attempted = False
+        if not evidence.has_evidence and req.allow_web_search:
+            web_attempted = True
+            stage_start = time.time()
+            evidence = self._web_evidence(plan.search_query, req.top_k)
+            retrieval_mode = f"{req.retrieval_mode}+web_fallback"
+            trace.append(TraceStep(
+                name="web_search_fallback",
+                latency_ms=int((time.time() - stage_start) * 1000),
+                detail=(
+                    f"self-hosted SearXNG: {len(evidence.sources)} sources"
+                    if evidence.has_evidence
+                    else "self-hosted SearXNG: no usable source"
+                ),
+            ))
         sources = evidence.sources
+        using_web_sources = bool(sources) and all(
+            source.source_type == "WEB" for source in sources
+        )
+        web_source_policy = (
+            "웹 검색 근거는 검색 결과에 표시된 요약 범위만 사용하세요. 링크의 전체 내용을 읽었다고 가정하지 말고, "
+            "요약에 없는 세부 수치·날짜·조건을 보완하지 마세요. 웹 정보임을 답변에서 한 번 자연스럽게 밝히세요. "
+            if using_web_sources else ""
+        )
         coverage = "NO_EVIDENCE" if not evidence.has_evidence else "UNASSESSED"
         missing_points = []
         generation_decision = generation_router.decide(plan, req.generation_mode)
@@ -470,10 +551,17 @@ class RAGService:
                         model=settings.PLANNER_MODEL or settings.LLM_MODEL,
                         plan=plan,
                         context_text=evidence.context_text,
-                        policy_instructions=novelty_judge.generation_instructions(plan),
+                        policy_instructions=(
+                            novelty_judge.generation_instructions(plan)
+                            + web_source_policy
+                        ),
                     )
                     valid_citations = {source.citation_number for source in sources}
-                    issues = claim_judge.quality_issues(candidate, valid_citations)
+                    issues = claim_judge.quality_issues(
+                        candidate,
+                        valid_citations,
+                        source_snippets=[source.snippet for source in sources],
+                    )
                     if issues:
                         answer = self._partial_evidence_answer(sources, issues)
                         coverage = "PARTIAL"
@@ -481,7 +569,7 @@ class RAGService:
                     else:
                         answer = claim_judge.validate_citations(candidate, valid_citations)
                         answer = novelty_judge.finalize(answer, plan)
-                        coverage = "UNASSESSED"
+                        coverage = "WEB_EVIDENCE" if using_web_sources else "UNASSESSED"
                     trace.append(TraceStep(
                         name="qwen_direct_generation",
                         latency_ms=int((time.time() - stage_start) * 1000),
@@ -494,7 +582,7 @@ class RAGService:
                         response_time_ms=int((time.time() - start_time) * 1000),
                         intent=plan.intent.value,
                         coverage=coverage,
-                        retrieval_mode=req.retrieval_mode,
+                        retrieval_mode=retrieval_mode,
                         generation_mode=generation_mode,
                         selected_citation_count=len(sources),
                         missing_points=missing_points,
@@ -530,7 +618,7 @@ class RAGService:
                         response_time_ms=elapsed_ms,
                         intent=plan.intent.value,
                         coverage=coverage,
-                        retrieval_mode=req.retrieval_mode,
+                        retrieval_mode=retrieval_mode,
                         generation_mode=generation_mode,
                         selected_citation_count=0,
                         missing_points=missing_points,
@@ -553,6 +641,7 @@ class RAGService:
                         policy_instructions=(
                             novelty_judge.generation_instructions(plan)
                             + novelty_judge.verification_instructions(plan)
+                            + web_source_policy
                             + retry_feedback
                         ),
                     )
@@ -560,6 +649,7 @@ class RAGService:
                         candidate,
                         valid_citations,
                         require_partial_disclosure=structured.coverage == "PARTIAL",
+                        source_snippets=[source.snippet for source in selected_sources],
                     )
                     if not issues:
                         cleaned = claim_judge.validate_citations(candidate, valid_citations)
@@ -568,6 +658,7 @@ class RAGService:
                             cleaned,
                             valid_citations,
                             require_partial_disclosure=structured.coverage == "PARTIAL",
+                            source_snippets=[source.snippet for source in selected_sources],
                         )
                         if not issues:
                             answer = cleaned
@@ -600,16 +691,19 @@ class RAGService:
                 sources = selected_sources
             except Exception as e:
                 logger.error("LM Studio LLM Generation error: %s", e)
-                answer = '검색된 원문 근거를 확인해주세요.\n\n' + '\n\n'.join(
-                    [f'[근거 {s.citation_number}] {s.title}: {s.snippet}' for s in sources]
-                )
+                answer = generation_unavailable_message(has_sources=bool(sources))
+                coverage = "GENERATION_FAILED"
         else:
             if not evidence.has_evidence:
-                answer = "저장된 지식에서 이 질문을 뒷받침할 충분한 근거를 찾지 못했습니다. 관련 게시글을 먼저 등록하거나 질문을 더 구체적으로 작성해주세요."
-            else:
-                answer = "검색된 관련 지식 요약 (BGE-M3 동적 청크 매칭):\n\n" + '\n\n'.join(
-                    [f'[근거 {s.citation_number}] {s.title}: {s.snippet}' for s in sources]
+                answer = (
+                    "내부 지식과 웹 검색에서 이 질문을 뒷받침할 충분한 근거를 찾지 못했습니다. "
+                    "질문을 더 구체적으로 작성해주세요."
+                    if web_attempted
+                    else "저장된 지식에서 이 질문을 뒷받침할 충분한 근거를 찾지 못했습니다. 관련 게시글을 먼저 등록하거나 질문을 더 구체적으로 작성해주세요."
                 )
+            else:
+                answer = generation_unavailable_message(has_sources=True)
+                coverage = "GENERATION_UNAVAILABLE"
 
         elapsed_ms = int((time.time() - start_time) * 1000)
         return QueryResponse(
@@ -619,7 +713,7 @@ class RAGService:
             response_time_ms=elapsed_ms,
             intent=plan.intent.value,
             coverage=coverage,
-            retrieval_mode=req.retrieval_mode,
+            retrieval_mode=retrieval_mode,
             generation_mode=generation_mode,
             selected_citation_count=len(sources),
             missing_points=missing_points,
@@ -628,30 +722,9 @@ class RAGService:
 
     @staticmethod
     def _partial_evidence_answer(sources, missing_points=None) -> str:
-        if not sources:
-            if missing_points:
-                return (
-                    "현재 저장된 근거만으로는 질문에 답하기 어렵습니다.\n\n"
-                    "확인되지 않은 항목:\n- "
-                    + "\n- ".join(missing_points)
-                )
-            return "현재 확인된 원문만으로는 답변을 구성하기 어렵습니다. 관련 자료를 보강해주세요."
-        evidence_lines = [
-            f"- {source.snippet.strip()} [근거 {source.citation_number}]"
-            for source in sources
-            if source.snippet.strip()
-        ]
-        missing_notice = ""
-        if missing_points:
-            missing_notice = (
-                "현재 근거만으로 확인하기 어려운 항목: "
-                + ", ".join(missing_points)
-                + "\n\n"
-            )
-        return (
-            missing_notice
-            + "최종 답변의 형식을 안정적으로 생성하지 못해, 확인 가능한 원문 범위만 제공합니다.\n\n"
-            + "\n".join(evidence_lines)
+        return partial_evidence_message(
+            has_sources=bool(sources),
+            missing_points=missing_points,
         )
 
 rag_service = RAGService()

@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import List
+from typing import List, Sequence
 
 from app.services.query_planner import QueryPlan
 
@@ -55,7 +55,7 @@ class ClaimJudge:
                 cleaned_lines.append(line)
 
         cleaned = "\n".join(cleaned_lines).strip()
-        return cleaned or "검색된 원문을 직접 인용해 답변을 구성하지 못했습니다. 출처 목록을 확인해주세요."
+        return cleaned or "관련 자료는 찾았지만 검증된 답변을 완성하지 못했습니다. 아래 근거 카드를 확인해주세요."
 
     @classmethod
     def naturalize_citations(cls, answer: str) -> str:
@@ -82,6 +82,26 @@ class ClaimJudge:
             natural_lines.append("".join(rewritten_parts))
         return "\n".join(natural_lines).strip()
 
+    @staticmethod
+    def move_citations_to_footer(answer: str) -> str:
+        """Keep prose citation-free and expose source links once at the bottom."""
+        citations: List[int] = []
+        for number in re.findall(r"\[근거\s+(\d+)\]", answer):
+            value = int(number)
+            if value not in citations:
+                citations.append(value)
+
+        body = re.sub(r"\[근거\s+\d+\]", "", answer)
+        body = re.sub(r"(?m)^\s*관련\s*근거\s*:\s*$", "", body)
+        body = re.sub(r"[ \t]+([,.!?。])", r"\1", body)
+        body = re.sub(r"[ \t]+\n", "\n", body)
+        body = re.sub(r"[ \t]{2,}", " ", body)
+        body = re.sub(r"\n{3,}", "\n\n", body).strip()
+        if not citations:
+            return body
+        footer = "관련 근거: " + " ".join(f"[근거 {number}]" for number in citations)
+        return f"{body}\n\n{footer}"
+
     def verify(
         self,
         llm_client,
@@ -103,6 +123,8 @@ class ClaimJudge:
             "영문 기술명과 고유명사는 참고 원문에 적힌 표기를 글자 단위로 그대로 복사하고 번역·음역·철자 변형을 하지 마세요. "
             "질문에 대한 직접 답변을 첫 1~2문장에 제시하고, 사실 주장이 있는 문단이나 항목 끝에 정확한 [근거 N]을 붙이세요. "
             "출처를 번호순으로 요약하지 말고 여러 근거를 하나의 논리적인 설명으로 종합하세요. "
+            "원문 문장·제목·검색 점수를 답변에 복사하지 말고 의미를 보존해 자연스럽게 재서술하세요. 원문 자체는 별도 근거 카드에만 표시됩니다. "
+            "'[근거 N] 제목: 원문' 같은 출처 목록이나 '검색된 원문을 확인하세요' 같은 안내문을 최종 답변으로 출력하지 마세요. "
             "초안에 등장했다는 이유만으로 모든 근거를 유지하지 말고, 질문에 직접 필요한 주장과 근거만 남기세요. "
             "'[근거 N]에서는'처럼 인용 번호를 문장의 주어로 사용하지 마세요. "
             "'직접 답변:', '근거 기반 설명:', '기술적 가능성:' 같은 고정된 보고서형 섹션을 만들지 말고, 질문이 요구할 때만 짧은 목록을 사용하세요. "
@@ -128,7 +150,8 @@ class ClaimJudge:
         )
         verified = response.choices[0].message.content or grounded_draft
         grounded = self.keep_cited_claims(verified)
-        return self.naturalize_citations(grounded)
+        natural = self.naturalize_citations(grounded)
+        return self.move_citations_to_footer(natural)
 
     def validate_citations(self, answer: str, valid_citations: set[int]) -> str:
         """Apply deterministic citation checks after the final answer model."""
@@ -139,7 +162,8 @@ class ClaimJudge:
             ),
             answer,
         )
-        return self.naturalize_citations(self.keep_cited_claims(cleaned))
+        natural = self.naturalize_citations(self.keep_cited_claims(cleaned))
+        return self.move_citations_to_footer(natural)
 
     @staticmethod
     def quality_issues(
@@ -147,6 +171,7 @@ class ClaimJudge:
         valid_citations: set[int],
         require_citation: bool = True,
         require_partial_disclosure: bool = False,
+        source_snippets: Sequence[str] | None = None,
     ) -> List[str]:
         """Return deterministic reasons that make a generated answer unsafe to ship."""
         stripped = answer.strip()
@@ -166,6 +191,19 @@ class ClaimJudge:
             issues.append("사용자 답변 대신 코드 블록이나 구조화 데이터가 출력되었습니다.")
         if re.search(r"\b(?:answer_focus|selected_citations|missing_points|coverage)\b", stripped):
             issues.append("내부 구조화 필드가 노출되었습니다.")
+        if re.search(r"(?:검색된\s+(?:원문|관련\s+지식)|원문\s+근거).{0,20}(?:확인|요약)", stripped):
+            issues.append("자연스러운 답변 대신 검색 결과 안내문이 출력되었습니다.")
+        if re.search(r"(?m)^\s*\[근거\s+\d+\]\s+[^\n:]{2,80}:", stripped):
+            issues.append("근거 제목과 원문이 답변 본문에 목록으로 노출되었습니다.")
+        normalized_answer = re.sub(r"\s+", " ", stripped).casefold()
+        for snippet in source_snippets or []:
+            normalized_snippet = re.sub(r"\s+", " ", snippet).strip().casefold()
+            if len(normalized_snippet) < 40:
+                continue
+            sample = normalized_snippet[: min(100, len(normalized_snippet))]
+            if sample in normalized_answer:
+                issues.append("근거 원문이 답변 본문에 그대로 복사되었습니다.")
+                break
         if require_partial_disclosure and not re.search(
             r"근거.{0,12}(?:부족|없|확인)|(?:판단|확인).{0,12}(?:어렵|없)|자료.{0,12}부족",
             stripped,

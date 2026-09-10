@@ -1,0 +1,16 @@
+# Local-only metasearch configuration. The container is not published to the host.
+use_default_settings: true
+
+server:
+  secret_key: "knowledge-hub-local-search-only"
+  limiter: false
+  image_proxy: false
+
+search:
+  safe_search: 1
+  formats:
+    - html
+    - json
+
+outgoing:
+  request_timeout: 6.0

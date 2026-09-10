@@ -137,6 +137,8 @@ public class PostService {
             indexReq.setCategory(category.getSection());
             indexReq.setTags(post.getTags());
             indexReq.setUrl("/posts/" + post.getId());
+            indexReq.setVisibility(Boolean.TRUE.equals(post.getIsPublished()) ? "PUBLIC" : "PRIVATE");
+            indexReq.setOwner_id(post.getAuthorId());
 
             webClientBuilder.baseUrl(fastApiUrl).build()
                     .post()

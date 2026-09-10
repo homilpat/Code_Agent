@@ -3,7 +3,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
-from app.models.schemas import SourceItem
+from app.models.schemas import AccessScope, SourceItem
 from app.services.query_planner import QueryPlan
 from app.services.retrieval_strategies import RankedHit, bm25_ranker, cross_encoder_reranker
 
@@ -37,6 +37,9 @@ class EvidenceRetriever:
         top_k: int,
         domain_filter: Optional[str],
         retrieval_mode: str = "dense",
+        access_scope: Optional[AccessScope] = None,
+        source_types: Optional[List[str]] = None,
+        excluded_sources: Optional[List[tuple[str, int]]] = None,
     ) -> EvidenceBundle:
         query_vector = self.embed_query(plan.search_query)
         candidate_limit = max(top_k * 6, 24)
@@ -45,6 +48,9 @@ class EvidenceRetriever:
             query_vector=query_vector,
             limit=candidate_limit,
             domain_filter=domain_filter,
+            access_scope=access_scope,
+            source_types=source_types,
+            excluded_sources=excluded_sources,
         )
         # MIN_SEARCH_SCORE is a cosine-similarity threshold. Apply it only to
         # dense scores; RRF and cross-encoder scores use different scales.
@@ -55,6 +61,9 @@ class EvidenceRetriever:
             points = self.vector_store.scroll_payloads(
                 limit=1000,
                 domain_filter=domain_filter,
+                access_scope=access_scope,
+                source_types=source_types,
+                excluded_sources=excluded_sources,
             )
             lexical_hits = bm25_ranker.rank(plan.search_query, points, candidate_limit)
             hits = self._reciprocal_rank_fusion(dense_hits, lexical_hits, candidate_limit)

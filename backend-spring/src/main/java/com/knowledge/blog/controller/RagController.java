@@ -4,6 +4,7 @@ import com.knowledge.blog.dto.RagQueryDto;
 import com.knowledge.blog.service.RagService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
@@ -15,8 +16,10 @@ public class RagController {
     private final RagService ragService;
 
     @PostMapping("/query")
-    public ResponseEntity<RagQueryDto.Response> queryKnowledge(@RequestBody RagQueryDto.Request request) {
-        return ResponseEntity.ok(ragService.searchAndAnswer(request));
+    public ResponseEntity<RagQueryDto.Response> queryKnowledge(
+            @RequestBody RagQueryDto.Request request,
+            Authentication authentication) {
+        return ResponseEntity.ok(ragService.searchAndAnswer(request, authentication));
     }
 
     @GetMapping("/evaluation/latest")
@@ -32,5 +35,15 @@ public class RagController {
     @PostMapping("/draft")
     public ResponseEntity<RagQueryDto.DraftResponse> generatePostDraft(@RequestBody RagQueryDto.DraftRequest request) {
         return ResponseEntity.ok(ragService.generatePostDraft(request));
+    }
+
+    @PostMapping("/learning-directions/{postId}")
+    public ResponseEntity<RagQueryDto.LearningDirectionResponse> recommendLearningDirections(
+            @PathVariable Long postId,
+            @RequestBody RagQueryDto.LearningDirectionRequest request,
+            Authentication authentication) {
+        RagQueryDto.LearningDirectionResponse response =
+                ragService.recommendLearningDirections(postId, request, authentication);
+        return response == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(response);
     }
 }

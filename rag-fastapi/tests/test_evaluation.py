@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from app.models.schemas import QueryRequest, QueryResponse
+from app.models.schemas import QueryRequest, QueryResponse, SourceItem
 from app.services.evidence_retriever import EvidenceRetriever
 from app.services.generation_router import GenerationRouter
 from app.services.evaluation_report import EvaluationReportService
@@ -108,6 +108,25 @@ class QueryContractTest(unittest.TestCase):
 
     def test_auto_is_the_default_generation_mode(self):
         self.assertEqual("auto", QueryRequest(query="테스트").generation_mode)
+
+    def test_web_fallback_is_enabled_by_default_and_can_be_disabled(self):
+        self.assertTrue(QueryRequest(query="테스트").allow_web_search)
+        self.assertFalse(QueryRequest(query="테스트", allow_web_search=False).allow_web_search)
+
+    def test_web_source_preserves_publisher_and_check_date(self):
+        source = SourceItem(
+            source_type="WEB",
+            source_id=1,
+            title="공식 문서",
+            category="WEB",
+            url="https://example.edu/docs",
+            snippet="검색 결과 요약",
+            score=0.9,
+            publisher="example.edu",
+            checked_at="2026-09-10T00:00:00+00:00",
+        )
+        self.assertEqual("example.edu", source.publisher)
+        self.assertIsNotNone(source.checked_at)
 
 
 class GenerationRouterTest(unittest.TestCase):

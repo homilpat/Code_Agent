@@ -4,7 +4,12 @@ from types import SimpleNamespace
 from app.models.schemas import SourceItem
 from app.services.answer_renderer import AnswerRenderer
 from app.services.evidence_structurer import EvidenceStructurer, StructuredEvidence
+from app.services.fallback_response import (
+    generation_unavailable_message,
+    partial_evidence_message,
+)
 from app.services.information_sufficiency import InformationSufficiencyJudge
+from app.services.indexing_policy import embedding_document_text
 from app.services.claim_judge import ClaimJudge
 from app.services.novelty_judge import NoveltyJudge
 from app.services.query_planner import QuestionStructure, QueryIntent, QueryPlan, QueryPlanner
@@ -209,7 +214,10 @@ class CitationValidationTest(unittest.TestCase):
 
         validated = ClaimJudge().validate_citations(answer, {1, 2})
 
-        self.assertEqual("유효한 주장입니다. [근거 1]", validated)
+        self.assertEqual(
+            "유효한 주장입니다.\n\n관련 근거: [근거 1]",
+            validated,
+        )
 
     def test_quality_check_rejects_empty_invalid_and_internal_output(self):
         judge = ClaimJudge()
@@ -224,6 +232,90 @@ class CitationValidationTest(unittest.TestCase):
         issues = ClaimJudge().quality_issues("핵심 차이는 출력 방식입니다. [근거 1]", {1})
 
         self.assertEqual([], issues)
+
+    def test_quality_check_rejects_source_list_in_answer_body(self):
+        issues = ClaimJudge().quality_issues(
+            "[근거 1] 전통적 머신러닝: 데이터를 기준에 따라 분기합니다.",
+            {1},
+        )
+
+        self.assertTrue(any("목록" in issue for issue in issues))
+
+    def test_quality_check_rejects_verbatim_source_copy(self):
+        snippet = (
+            "의사결정 나무는 데이터를 특정 기준으로 나누고 정보 획득량이 큰 지점을 찾아 분기합니다."
+        )
+        issues = ClaimJudge().quality_issues(
+            f"{snippet} [근거 1]",
+            {1},
+            source_snippets=[snippet],
+        )
+
+        self.assertTrue(any("그대로 복사" in issue for issue in issues))
+
+    def test_quality_check_accepts_natural_paraphrase_with_citation(self):
+        snippet = (
+            "의사결정 나무는 데이터를 특정 기준으로 나누고 정보 획득량이 큰 지점을 찾아 분기합니다."
+        )
+        issues = ClaimJudge().quality_issues(
+            "의사결정 나무는 불순도를 가장 잘 줄이는 조건을 반복적으로 선택합니다. [근거 1]",
+            {1},
+            source_snippets=[snippet],
+        )
+
+        self.assertEqual([], issues)
+
+    def test_citations_are_collected_once_at_answer_footer(self):
+        answer = (
+            "첫 번째 설명입니다. [근거 2]\n\n"
+            "두 번째 설명입니다. [근거 1][근거 2]"
+        )
+
+        rendered = ClaimJudge().validate_citations(answer, {1, 2})
+
+        self.assertEqual(
+            "첫 번째 설명입니다.\n\n두 번째 설명입니다.\n\n"
+            "관련 근거: [근거 2] [근거 1]",
+            rendered,
+        )
+        self.assertEqual(1, rendered.count("관련 근거:"))
+
+
+class FallbackResponseTest(unittest.TestCase):
+    def test_generation_failure_does_not_dump_source_snippets(self):
+        answer = generation_unavailable_message(has_sources=True)
+
+        self.assertIn("답변 생성 모델에 연결하지 못했습니다", answer)
+        self.assertIn("근거 카드", answer)
+        self.assertNotIn("[근거 1]", answer)
+
+    def test_partial_evidence_message_is_natural_and_does_not_list_sources(self):
+        answer = partial_evidence_message(
+            has_sources=True,
+            missing_points=["분류 대상", "출력 라벨"],
+        )
+
+        self.assertIn("관련 원문은 찾았지만", answer)
+        self.assertIn("분류 대상, 출력 라벨", answer)
+        self.assertNotIn("[근거", answer)
+        self.assertNotIn("원문 1", answer)
+
+
+class IndexingPolicyTest(unittest.TestCase):
+    def test_title_is_embedded_with_every_content_chunk(self):
+        text = embedding_document_text(
+            "1세대 머신러닝 모델",
+            "로지스틱 회귀와 선형 회귀를 설명합니다.",
+        )
+
+        self.assertEqual(
+            "1세대 머신러닝 모델\n로지스틱 회귀와 선형 회귀를 설명합니다.",
+            text,
+        )
+
+    def test_empty_title_or_chunk_does_not_add_blank_separator(self):
+        self.assertEqual("본문", embedding_document_text("", "본문"))
+        self.assertEqual("제목", embedding_document_text("제목", ""))
 
     def test_partial_answer_must_disclose_missing_scope(self):
         issues = ClaimJudge().quality_issues(

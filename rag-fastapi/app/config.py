@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Manufacturing Knowledge RAG Service (LM Studio + BGE-M3)"
+    PROJECT_NAME: str = "Knowledge Hub RAG Service (LM Studio + BGE-M3)"
     QDRANT_HOST: str
     QDRANT_PORT: int
     QDRANT_COLLECTION: str
@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     RERANKER_MODEL_NAME: str = "BAAI/bge-reranker-v2-m3"
     VECTOR_DIMENSION: int = 1024
     MIN_SEARCH_SCORE: float
+    SEARXNG_URL: Optional[str] = None
+    WEB_SEARCH_TIMEOUT_SECONDS: float = 8.0
+    WEB_SEARCH_MAX_RESULTS: int = 5
 
     class Config:
         env_file = ".env"

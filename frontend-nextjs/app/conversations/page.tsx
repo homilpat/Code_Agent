@@ -25,6 +25,7 @@ function parseTurns(value: string): ConversationTurn[] {
 }
 
 function sourceUrl(source: ConversationTurn['sources'][number]) {
+  if (source.sourceType === 'WEB' && source.url && /^https?:\/\//i.test(source.url)) return source.url;
   return source.url && /^\/posts\/\d+$/.test(source.url) ? source.url : `/posts/${source.sourceId}`;
 }
 

@@ -1,4 +1,4 @@
-# 제조지식창고 블로그 운영 방법
+# Knowledge Hub 종합 지식 블로그 운영 방법
 
 이 문서는 로컬 개발 환경에서 블로그 전체 서비스를 실행하고 종료하는 방법을 설명합니다.
 
@@ -13,6 +13,7 @@ Docker Compose가 다음 서비스를 함께 실행합니다.
 | FastAPI | AI/RAG 처리 | Docker 내부 통신 |
 | MySQL | 사용자, 카테고리, 게시글 저장 | Docker 내부 통신 |
 | Qdrant | RAG 벡터 저장 | Docker 내부 통신 |
+| SearXNG | API 키 없는 웹 메타 검색 | Docker 내부 통신 |
 
 포트는 루트의 `.env` 설정에 따라 달라질 수 있습니다.
 
@@ -66,6 +67,7 @@ docker compose logs -f backend-spring
 docker compose logs -f rag-fastapi
 docker compose logs -f mysql-db
 docker compose logs -f vector-db
+docker compose logs -f web-search
 ```
 
 로그 화면은 `Ctrl+C`로 빠져나옵니다. 서비스 자체는 계속 실행됩니다.
@@ -180,6 +182,25 @@ docker compose logs --tail=100 backend-spring
 ```powershell
 docker compose ps
 docker compose logs --tail=100 rag-fastapi
+```
+
+### RAG 답변 또는 학습 방향의 웹 자료가 나오지 않는 경우
+
+- 일반 RAG와 학습 방향 모두 내부 자료가 연결되면 정책상 웹 검색을 실행하지 않는 것이 정상입니다.
+- 일반 RAG는 요청의 `allow_web_search`가 `false`이면 내부 검색 실패 후에도 웹 검색을 실행하지 않습니다.
+- 내부 자료도 없는데 일반 RAG가 근거 없음으로 끝나거나 학습 방향에 `추천 아이디어`만 표시되면 `web-search` health와 로그를 확인합니다.
+- SearXNG는 API 키를 사용하지 않지만 외부 검색 엔진에 접근할 수 있는 인터넷 연결이 필요합니다.
+- 웹 출처는 검색 결과 요약문 기반입니다. 중요한 답변은 출처 카드의 URL에서 원문을 확인합니다.
+
+```powershell
+docker compose ps web-search
+docker compose logs --tail=100 web-search
+```
+
+ACL payload가 추가되기 전에 색인한 기존 Qdrant 청크는 검색에서 제외됩니다. 새 버전을 처음 실행한 뒤 다음 명령으로 전체 재색인을 수행하거나 관리자가 각 게시물의 `RAG 재색인`을 실행해야 합니다.
+
+```powershell
+docker compose exec rag-fastapi python scripts/reindex_all_posts.py
 ```
 
 ## 9. 개발용 프론트엔드만 실행
