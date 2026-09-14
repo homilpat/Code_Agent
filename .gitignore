@@ -51,3 +51,8 @@ frontend-nextjs/design/
 frontend-nextjs/supabase/
 **/AGENTS.md
 **/CLAUDE.md
+
+# Machine-local dev-guard pilot (absolute interpreter paths)
+.claude/settings.local.json
+.codex/hooks.json
+.codex/config.toml
