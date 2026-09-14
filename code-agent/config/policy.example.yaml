@@ -1,0 +1,27 @@
+# Administrative example: copy only into an owner-private store outside repositories.
+# These are explicit example weights, not a claim of a validated production risk rubric.
+schema_version: security-policy-v1
+version: local-example-v1
+ingestion:
+  version: ingestion-v1
+  excluded_directories: [.git, .knowledge-hub, node_modules, .venv, __pycache__, target, build, dist, .next]
+  max_entries: 10000
+  max_file_bytes: 262144
+  max_total_bytes: 16777216
+  max_depth: 32
+  max_seconds: 15
+risk:
+  rule_version: risk-example-v1
+  threshold_version: thresholds-v1
+  medium_at: 40
+  high_at: 70
+  factors:
+    - {name: callers, weight: 15, normalization: COUNT, count_cap: 20}
+    - {name: dependencies, weight: 10, normalization: COUNT, count_cap: 10}
+    - {name: complexity, weight: 10, normalization: COUNT, count_cap: 20}
+    - {name: test_coverage, weight: 15, normalization: INVERSE_PERCENT, count_cap: 1}
+    - {name: test_harness_change, weight: 10, normalization: BOOLEAN, count_cap: 1}
+    - {name: external_boundary, weight: 10, normalization: BOOLEAN, count_cap: 1}
+    - {name: persistence, weight: 10, normalization: BOOLEAN, count_cap: 1}
+    - {name: security, weight: 15, normalization: BOOLEAN, count_cap: 1}
+    - {name: filesystem_semantics, weight: 5, normalization: BOOLEAN, count_cap: 1}

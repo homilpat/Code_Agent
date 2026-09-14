@@ -1,0 +1,1 @@
+"""CLI-first application boundary."""
