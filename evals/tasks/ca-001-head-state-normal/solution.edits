@@ -1,0 +1,7 @@
+src/kh_agent/repository/metadata.py
+<<<<<<< SEARCH
+                    declared_head_oid = value
+=======
+                    declared_head_oid = value
+                    head_state = "NORMAL"
+>>>>>>> REPLACE
