@@ -43,22 +43,26 @@ def read_metadata(path: Path, limit: int = 4096) -> bytes:
         after = os.fstat(stream.fileno())
         named = path.lstat()
 
-        def signature(value: os.stat_result) -> tuple:
-            return (
+        def signature(value: os.stat_result, ctime: bool = True) -> tuple:
+            fields = (
                 value.st_dev,
                 value.st_ino,
                 value.st_mode,
                 value.st_nlink,
                 value.st_size,
                 value.st_mtime_ns,
-                value.st_ctime_ns,
             )
+            return (*fields, value.st_ctime_ns) if ctime else fields
 
+        # Windows path lookups can report st_ctime_ns a few ms behind the open handle for a
+        # recently written file, which made this check fail at random. The handle-vs-path
+        # comparison omits ctime there only; Linux, the supported runtime, compares every field.
+        path_ctime = sys.platform == "linux"
         if (
             len(data) > limit
             or len(data) != info.st_size
             or signature(info) != signature(after)
-            or signature(after) != signature(named)
+            or signature(after, path_ctime) != signature(named, path_ctime)
             or is_alias(path)
         ):
             raise DomainError(ErrorCode.SAFE_GIT_POLICY_BLOCKED)
