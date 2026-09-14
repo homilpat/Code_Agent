@@ -1,6 +1,60 @@
 # Code Agent 구현 진행 기록
 
-기준일: 2026-09-14 (Asia/Seoul), 마지막 코드 검증: 2026-09-13
+기준일: 2026-09-14 (Asia/Seoul), 마지막 코드 검증: 2026-09-14
+
+## 2026-09-14 오후 기록: 새 레포 이전, go/no-go 평가, 방향 전환(dev-guard)
+
+사용자 요청으로 기록. 아래 내용이 이 문서의 기존 "다음 시작점"보다 최신이다.
+
+### 1. 작업 위치 변경 (중요)
+
+- 코드와 문서는 GitHub `homilpat/Code_Agent`(public)로 이전했다. 로컬 작업 폴더는 바탕화면 `Code_Agent`(git)다.
+- 요구사항 폴더의 `blogProject/blogProject-main/code-agent/`는 git이 없는 **옛 사본**이다. 이후 수정하지 않는다.
+- `homilpat/blogProject` 이력 13커밋을 그대로 이어받았고, 기존 레포에 `v1.0-blog` 태그를 달았다(새 레포에도 있음). `future-work/rag-search-pipeline` 브랜치(RAG 평가 파이프라인)도 새 레포로 옮겼다.
+- `docs/`: 요구사항 동결 세트(SHA256 16개 일치, `.gitattributes`로 줄바꿈 변환 금지), 상세 설계서, 이 진행 기록(로컬 경로 가림). 재부팅 인수인계 기록은 공개 레포에서 제외했다.
+
+### 2. Windows 간헐 실패 수정 (`b8060c7`)
+
+- 증상: 같은 테스트를 20회 실행하면 6회 실패. 원인은 `read_metadata`의 파일 핸들(`fstat`)과 경로(`lstat`) 비교에서 Windows 경로 조회의 `st_ctime_ns`가 몇 ms 늦게 반영되는 것(측정 300회 중 21회 불일치).
+- 수정: Linux가 아닌 환경에서만 핸들-경로 비교에서 ctime 제외. Linux는 모든 필드 비교 유지. 회귀 테스트는 수정 전 코드에서 실패함을 확인했다.
+- 결과: 전체 테스트 20/20회 통과, **131 passed / Linux 전용 5 skipped**. 이전의 "129 passed" 기록에는 우연히 통과한 실행이 섞였을 수 있다. Linux 테스트는 여전히 미실행이다.
+
+### 3. go/no-go 평가 러너 (`evals/`, `70fe604`)
+
+- 구조: 고정 기준 커밋에서 임시 작업 폴더 생성 → 문제 설명과 문맥 파일 제공 → 모델은 SEARCH/REPLACE 블록으로만 답함(러너가 전부 적용 또는 전부 거부) → 숨김 테스트 포함 전체 테스트 → 실패 출력으로 최대 N회 재시도 → JSONL 기록. 실패 테스트는 최대 2회 재실행하고 `flaky`로 기록한다.
+- 과제 2개(2026-09-14 코드 리뷰 결함): `ca-001` 정상 브랜치 `head_state` NORMAL, `ca-002` 삭제된 등록 저장소 때문에 정책 로드 실패. `validate`로 "기준 커밋에서 실패, 정답 패치로 전체 통과"를 3회 연속 확인했다.
+- 모델 환경: LM Studio, `qwen/qwen3.6-35b-a3b` Q4_K_M(22.07GB), 문맥 32K, VRAM 14.8/16GB + 나머지 RAM, 약 8 tok/s. `mistralai/devstral-small-2-2512` Q4_K_M은 다운로드 중(기록 시점 88%, 속도 약 1MB/s).
+- 첫 결과: **2/2 PASS**. ca-001 1회, ca-002 2회(첫 답이 시스템 프롬프트 예시의 `path/` 접두어를 그대로 써 APPLY_ERROR). 과제당 약 4분이며 대부분 모델 응답 시간이다.
+- 판단: 과제가 쉽고(한 파일 몇 줄), 문맥 파일을 직접 지정했고, 과제 수가 부족해 **go/no-go 결론은 보류**. 기본 루프가 로컬 모델로 동작한다는 점은 확인했다.
+- 주의: 두 결함은 평가 과제의 정답 패치로만 존재하고 **code-agent 제품 코드에는 아직 반영하지 않았다.**
+- 평가용 Python venv는 임시 폴더에 만들었으므로 재개 시 다시 만들어야 한다: `python -m venv` 후 `pip install -e code-agent[dev]`, 저장소 루트에서 `python -m evals.runner validate` / `run --model ...`.
+
+### 4. 상세 설계서 갱신 (`29a9784`)
+
+- 사용자가 대상 언어 구조를 추가했다: Python PARTIAL / TS·JS phase 2 / Java phase 3, 비실행 structural adapter(M02)와 toolchain adapter(M06/M07) 분리, `LanguageFamily`, structural·toolchain·effective 상태 분리, `language_adapter_set_hash`, 다중 언어 검증 계획, `HeadState.UNBORN` 구현 공백 명시. 1차 리뷰 지적 4건(`SUPPORTED` 오기, Python ACTIVE 과장, `family: str`, `.mts/.cts`)은 반영됐다.
+- 남은 지적: `effective_status` 결정 규칙의 "나머지 조합은 PARTIAL"이 PARTIAL 정의("일부 capability는 실제 사용 가능")와 모순된다. `PLANNED + UNSUPPORTED`처럼 사용 가능한 layer가 없으면 UNSUPPORTED여야 한다.
+- 이 레포의 설계서는 14:21 수정본까지 반영했다. 14:26 수정본(`effective_status` 규칙 추가)은 아직 동기화하지 않았다.
+
+### 5. 방향 논의와 결정
+
+- QLoRA 등 파인튜닝은 지금 하지 않는다. 기준 측정과 학습 데이터가 없고, 틀·문맥·피드백 개선이 먼저다.
+- 기업은 보통 계약(학습 금지·무보관), 자사 클라우드 경유, 관리형 설정·게이트웨이로 해결한다. 폐쇄망 로컬 에이전트는 망분리 등 틈새 수요다.
+- 결정: 개발할 때 쓰는 **가드레일·품질 도구(dev-guard)를 별도 레포**로 만든다. 대상은 Claude Code와 Codex CLI 둘 다, 언어는 Python·TS/JS·Java. 원칙은 프롬프트가 아닌 결정적 검사로 강제, 효과가 측정된 기능만 추가, 외부 도구(Serena, Semgrep, claude-mem 등)는 코드를 복사하지 않고 연결.
+- v1.10 전체 구현을 중단한다는 결정은 하지 않았다. 우선순위가 dev-guard로 옮겨졌다.
+
+### 6. dev-guard 1단계 (`homilpat/dev_guards`, public, `d3d37b2`)
+
+- 요구사항 폴더의 규칙(M06, M08, 요구사항 민감 파일 목록, code-agent `ingestion.py`·`sandbox/policy.py`, 이 문서의 모델 금지 사항)을 hook으로 옮겼다. 규칙 18개, 각 규칙에 근거 문서를 연결했다.
+- 조정: M08 "외부 LLM API 금지"는 민감 파일 차단 + `local-only` 저장소 차단으로 바꿨다. 일반 비밀값 할당, 패키지 설치, `git push`, 작업 폐기 git 명령, 분석 불가 명령은 차단 대신 확인. Codex hook은 확인 창이 없어 확인 규칙도 차단하고 execpolicy `prompt` 규칙을 함께 생성한다.
+- 검증: 테스트 112개 통과(생성한 규칙을 실제 `codex execpolicy check`로 확인 포함), ruff 통과, `claude plugin validate` 통과. **아직 어떤 환경에도 설치하지 않았다.** 라이선스는 정하지 않았다.
+
+### 다음 할 일 (추천 순서, 사용자 최종 확정 전)
+
+1. dev-guard를 Code_Agent 프로젝트에만 적용해 실사용 테스트(전역 설치 없이 dev-guard venv 절대 경로 사용).
+2. dev-guard 2단계: 작업 종료 전 테스트 강제(Stop 게이트) → 언어별 메모리·CPU 측정 → 최적화 루프.
+3. Code_Agent 평가: 프롬프트 예시 수정, 과제 확대(UNBORN, `PatchStore.propose` base binding 등), qwen3-8b·Devstral 비교, ca-001/002 실제 수정 반영.
+4. 설계서 `effective_status` 규칙 수정 후 docs 동기화.
+5. 라이선스는 사업화 방향이 정해질 때까지 보류.
 
 ## 2026-09-14 방향 기록: Ponytail/Potpie 장점 추출, 측정 도구, 자동 측정 실행기
 
