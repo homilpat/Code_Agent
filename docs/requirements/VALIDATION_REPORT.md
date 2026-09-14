@@ -1,0 +1,95 @@
+# FINAL VALIDATION REPORT — v7
+
+- Total checks: **86**
+- Passed: **86**
+- Failed: **0**
+- Module ↔ integrated exact match: **11/11**
+- M11 Acceptance Flow: **1..48 continuous**
+
+## Checks
+- [x] M01: individual module == integrated section
+- [x] M01: Markdown fences balanced
+- [x] M01: sane file size
+- [x] M02: individual module == integrated section
+- [x] M02: Markdown fences balanced
+- [x] M02: sane file size
+- [x] M03: individual module == integrated section
+- [x] M03: Markdown fences balanced
+- [x] M03: sane file size
+- [x] M04: individual module == integrated section
+- [x] M04: Markdown fences balanced
+- [x] M04: sane file size
+- [x] M05: individual module == integrated section
+- [x] M05: Markdown fences balanced
+- [x] M05: sane file size
+- [x] M06: individual module == integrated section
+- [x] M06: Markdown fences balanced
+- [x] M06: sane file size
+- [x] M07: individual module == integrated section
+- [x] M07: Markdown fences balanced
+- [x] M07: sane file size
+- [x] M08: individual module == integrated section
+- [x] M08: Markdown fences balanced
+- [x] M08: sane file size
+- [x] M09: individual module == integrated section
+- [x] M09: Markdown fences balanced
+- [x] M09: sane file size
+- [x] M10: individual module == integrated section
+- [x] M10: Markdown fences balanced
+- [x] M10: sane file size
+- [x] M11: individual module == integrated section
+- [x] M11: Markdown fences balanced
+- [x] M11: sane file size
+- [x] M11: Acceptance Flow numbering is continuous 1..48
+- [x] M01 canonical repository identity
+- [x] M01 informed approval evidence
+- [x] M01 crash recovery reconcile
+- [x] M01 no implicit Git object fetch
+- [x] M02 dirty Graph freshness
+- [x] M02 nested Repository ACL boundary
+- [x] M02 mount/filesystem boundary
+- [x] M02 Git object/materialization scope
+- [x] M03 immutable request envelope
+- [x] M03 request/acceptance traceability
+- [x] M03/M05 patch proposal ownership
+- [x] M04 Canonical Actual Change Set Final Risk
+- [x] M05 proposal base binding
+- [x] M05 request lineage separation
+- [x] M05 patch artifact schema/provenance
+- [x] M05 nested Repository patch boundary
+- [x] M05 alias-safe apply
+- [x] M05 Canonical Actual Change Set covers new/ignored files
+- [x] M05 Git object source boundary
+- [x] M05 source/apply consistency
+- [x] M06 pre/post Guardrail
+- [x] M06 alias-safe filesystem boundary
+- [x] M06 nested Repository Sandbox boundary
+- [x] M06 Host credential isolation
+- [x] M06 prompt injection boundary
+- [x] M06 policy self-authorization block
+- [x] M06 no Safe-Git lazy fetch
+- [x] M07 five-state check model
+- [x] M07 NOT_APPLICABLE self-exemption blocked
+- [x] M07 test/toolchain provenance
+- [x] M07 request intent in Verification Basis
+- [x] M08 sensitive runtime/provenance boundary
+- [x] M08 implicit Git fetch blocked
+- [x] M08 explicit remote intent required
+- [x] M09 append-only/crash consistency
+- [x] M09 proposal stale event
+- [x] M09 request intent + approval evidence audit
+- [x] M09 patch artifact schema restore
+- [x] M10 approval view bound to request/evidence
+- [x] M10 safe untrusted rendering
+- [x] M11 proposal base stale branch
+- [x] M11 alias-safe apply
+- [x] M11 informed approval
+- [x] M11 recovery reconcile
+- [x] M11 immutable Remote source
+- [x] M11 Remote explicit intent
+- [x] No lock-failure => STALE misclassification
+- [x] No warning-only external provider
+- [x] No old M11 symlink-safe wording
+- [x] No old Actual Git Diff authority
+- [x] Public Internet Git Provider remains forbidden
+- [x] Local apply does not imply Remote publish

@@ -1,0 +1,288 @@
+# Code Agent 구현 진행 기록
+
+기준일: 2026-09-14 (Asia/Seoul), 마지막 코드 검증: 2026-09-13
+
+## 2026-09-14 방향 기록: Ponytail/Potpie 장점 추출, 측정 도구, 자동 측정 실행기
+
+- 사용자 요청으로 기록. 외부 도구를 통째로 의존하지 않고 장점만 우리 구조에 맞게 넣는 방향이다. 구현 미착수, 문서만 갱신했다. 현재 `profile/optimize`는 `CAPABILITY_NOT_AVAILABLE`이고 sandbox 실행 backend가 없으므로 아래 측정은 M07 단계 계획이다.
+
+### Ponytail에서 가져올 것 / 버릴 것
+
+- 가져올 것:
+  - 판단 사다리(필요성 → 기존 코드 재사용 → 표준 라이브러리 → 설치된 의존성 → 최소 구현). patch proposal에 "선택한 단계와 이유" 필드로 남긴다.
+  - 버그는 원인에서 수정: 수정 함수의 호출처를 모두 확인하고 공용 함수를 한 번 수정.
+  - 줄이지 않는 항목: 신뢰 경계 입력 검증, 데이터 손실 방지, 보안.
+  - `ponytail:` 주석(의도적 단순화의 한계·개선 경로)과 부채 장부.
+  - 비자명 로직에는 실행 가능한 검사 1개를 남긴다.
+- 버릴 것: 프롬프트만으로 강제하는 방식. 작은 모델은 무시하므로 추가 줄 수·새 의존성·새 파일 수를 자동 검사로 강제한다.
+
+### Potpie에서 가져올 것 / 버릴 것
+
+- 가져올 것:
+  - 코드 외 지식(결정사항, 과거 버그·원인, 팀 규칙, 변경 이력). LSP로 얻을 수 없는 정보.
+  - 작업 전 맥락 조회(`potpie resolve "<task>"`).
+  - 서버 요약 없이 근거만 반환하는 방식(설계의 Evidence Priority와 일치).
+  - 지식 기록 시 propose → verify → commit 절차.
+  - 규칙/구조/이력/버그 차원 + 방해 데이터를 포함한 평가 방식.
+- 버릴 것: 외부 연동·로그인(Local-Only 충돌), 무거운 의존성, Python >=3.12 요구.
+- 순서: 재구현부터 하지 않는다. Potpie를 별도 CLI로 붙여 평가 세트로 효과를 측정한 뒤, 효과가 확인된 기능만 SQLite 기반으로 경량 구현한다.
+
+### 메모리·성능 측정 도구
+
+| 대상 | 도구 | 보여주는 것 |
+|---|---|---|
+| Python 할당 | `tracemalloc` | 최대 사용량, 할당 상위 N줄(`statistics("lineno")`), 수정 전후 비교(`snapshot.compare_to`) |
+| Python 네이티브 포함 | memray (Linux) | C 확장 포함 할당 flame graph |
+| 줄 단위 CPU+메모리 | Scalene | 줄별 CPU·메모리 |
+| 프로세스 전체 | `ru_maxrss`, sandbox cgroup `memory.peak` | 실제 최대 사용량, OOM 여부 |
+| 누수 의심 | `gc` 객체 타입별 개수 | 반복 실행 시 증가하는 타입 |
+| Java(Spring) | JFR, `-Xlog:gc`, heap dump + MAT | 할당 위치, GC 부담, 힙 점유 |
+
+- 결과는 JSON 보고서(최대 사용량, 할당 상위 위치, 기준선 대비 증가율)로 artifact에 저장하고 모델에 전달한다. 파일 경로가 포함되므로 M08 분류를 적용한다.
+
+### 언제 무엇을 실행하나
+
+| 시점 | 실행 | 이유 |
+|---|---|---|
+| 매 수정 루프 | tracemalloc 최대 사용량 + 상위 N줄, cgroup `memory.peak`/OOM | 가볍고 권한 불필요, cgroup은 sandbox 제한으로 비용 거의 없음 |
+| 메모리 한도 초과 시 | `compare_to` 전후 비교, gc 타입별 개수 | 원인 위치를 좁혀 피드백 |
+| `kh profile` / `kh optimize` | memray, Scalene, py-spy | 무겁고 일부 ptrace 필요 → 설계 21절 `profiling-ptrace` 전용 sandbox |
+| 대상 저장소가 Java일 때 | JFR, GC 로그, heap dump | 현재 code-agent는 Python(pytest 템플릿)만 지원 |
+
+- 측정 도구는 sandbox 이미지에 미리 포함한다(`--network=none`이라 실행 중 설치 불가).
+- memray는 Linux 전용이므로 WSL/Linux 환경 확보가 선행 조건이다.
+- 현재 code-agent 자체 개발 시에는 sandbox 없이 pytest에 메모리 테스트(예: 스캐너 증가율)를 바로 넣을 수 있다.
+
+### 자동 측정 실행기 구조
+
+- 측정 분리는 모델이 아니라 trusted 실행기가 매 루프 강제한다.
+  1. 1차: pytest(측정 도구 없음) → 기능 통과 여부 + 실행 시간.
+  2. 2차: pytest + 메모리 측정기 → 메모리 한도 테스트만 실행 → JSON 보고서.
+  3. trusted 한도와 비교 → 초과 시 할당 상위 N줄을 모델에 전달 → 재수정.
+- `sandbox/policy.py`의 `python-pytest-v1` 옆에 측정용 템플릿(예: `python-pytest-memory-v1`)을 추가한다. 측정기는 저장소 밖 trusted 경로에서 `-p`로 로드하며, 기존 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`로 저장소 플러그인의 개입을 막는다.
+- 모델 몫: 한도와 이전 측정 결과를 문맥으로 받아 메모리를 고려한 수정을 시도한다. 준수는 보장되지 않으며 최종 판정은 2차 측정 게이트가 한다.
+- 모델 금지: 제품 코드에 tracemalloc 등 측정 코드 삽입(측정은 실행기가 외부에서 부착), 메모리 한도·한도 테스트 수정(trusted 설정에만 존재, 수정 patch 차단).
+
+### 그 밖의 고려 사항
+
+- 품질·안정성: CPU·시간 프로파일(cProfile, py-spy, 증가율), 리소스 누수(fd, 스레드, DB 연결, 임시 파일, 좀비 프로세스), 동시성·TOCTOU·SQLite 잠금, 보안 정적 분석(ruff `S`, semgrep 로컬 규칙, 비밀정보 스캐너 보강 — 현재 정규식 4개), 의존성 공급망(lock 파일, 오프라인 OSV 미러, 라이선스).
+- 루프 운영:
+  - 실패 원인 분류(검색 실패/형식 오류/로직 오류/테스트 환경)를 기록해 개선할 부품을 판단한다. 최우선 권장.
+  - 반복별 시간·토큰·재시도·결과 기록을 평가 지표로 사용.
+  - 재현성: 모델 버전 고정, temperature 0, 환경 fingerprint.
+  - GPU 경합: 블로그 RAG와 code-agent가 같은 LM Studio/A4000을 공유하므로 작업 대기열 또는 모델 분리가 필요하다.
+  - 사용자 확인 화면: diff 보기, 변경 이유, 되돌리기.
+
+## 2026-09-14 방향 기록: 코드 작성 흐름과 측정 기반 검사 루프
+
+- 사용자 요청으로 기록. 개발 중(Claude/Codex 등)과 제품 내 로컬 모델 수정 루프에 공통 적용할 흐름이다. 구현 미착수, 문서만 갱신했다.
+- 전제: 의존성 파악과 Ponytail은 호출처 파손·중복·비대화를 막지만, 이번 리뷰 결함(검사 누락, 분기 누락, 예외 상황 미고려)은 의존성/길이 문제가 아니었고 Ponytail 방식 코드와 129개 테스트 통과 상태에서 발견됐다. 따라서 실패 테스트 선행과 독립 검증이 필요하다. 현재 `impact`는 import 이름 매칭 수준이고 Potpie는 미연결이므로 정확한 의존성 파악에는 LSP 보강이 필요하다.
+
+### 작업 흐름 (변경 단위마다)
+
+1. 의존성 파악: Potpie로 넓은 관련성, LSP(pyright/jedi)로 정확한 정의·참조·호출처.
+2. 실패 테스트 선행: 원하는 동작과 메모리/시간 한도를 먼저 테스트로 작성하고 수정 전 실패를 확인.
+3. Ponytail로 최소 구현.
+4. 테스트 + 측정: pytest, tracemalloc/프로세스 메모리, 필요 시 benchmark.
+5. 독립 리뷰: 생성 과정과 다른 관점(별도 세션/모델)에서 diff 검토.
+
+### 메모리·힙 검사 루프 조건
+
+- 원칙: 메모리는 코드 읽기로 "고려"하지 않고 측정으로 판정한다(M07 근거 기반 측정). 읽기로 잡을 수 있는 것은 전체 적재·무한 증가 같은 명백한 패턴까지다.
+- 루프: 구현 → 기능 테스트 + 메모리 테스트 → 실패 시 측정 결과 전달 → 수정 → 최대 N회 반복.
+- 필수 조건:
+  1. 한도는 모델이 변경 불가: 한도 값은 저장소 밖 trusted 설정에서 주입하고, 한도 테스트를 수정·삭제·skip하는 patch는 Test Selection Integrity 위반으로 차단한다.
+  2. 입력 크기 고정 + 증가율 검사: 작은 fixture만으로 판정하지 않는다. 예: 입력 10배에서 peak가 정해진 배수(예: 3배) 이내인지 확인해 전체 메모리 적재 구조를 탐지한다.
+  3. 측정 대상 구분: tracemalloc은 Python 할당만 측정한다. 프로세스 전체는 `ru_maxrss` 또는 sandbox cgroup `memory.peak`, sandbox `--memory` 초과 OOM kill은 FAIL. Java(Spring)는 `-Xmx` 제한 + GC 로그, 필요 시 heap dump.
+  4. 흔들림 처리: 3회 중앙값, 허용 오차(예: 10%), 기능 테스트와 분리 실행(tracemalloc 오버헤드).
+  5. 피드백 내용: 실패 여부만이 아니라 `tracemalloc.take_snapshot().statistics("lineno")[:10]` 상위 할당 위치를 모델에 전달한다.
+  6. 종료 조건: 기능 테스트와 메모리 테스트가 모두 통과해야 성공(기능을 깨서 메모리를 줄이는 경우 차단). N회 내 개선이 없으면 중단하고 `INCONCLUSIVE`로 기록한다.
+- 첫 적용 후보: `repository/snapshot.py` 스캐너는 모든 `.py` 내용을 `SourceFile.content`로 메모리에 보관하므로 증가율 테스트 대상으로 적합하다.
+
+### 추가 검사 후보 (이번 리뷰 결함 유형 대응 우선)
+
+1. 요구사항 ID ↔ 테스트 매핑: 설계의 테스트 ID(M01-UT-001, M02-CTX-001 등)를 테스트에 표시하고 매핑이 없는 불변조건을 목록화한다. "검사 줄 자체가 없는" 결함(base binding, `head_state`)을 찾는 가장 직접적인 방법. 현재 테스트에는 요구사항 ID 표시가 없다.
+2. Property-based 테스트(hypothesis): `refs.py` packed-refs 파서, `core/canonical.py` 경로 인코딩, `patch/canonical.py` candidate 파서 등 파서·정규화 코드의 경계 입력 탐색.
+3. 변경 코드 대상 mutation testing(mutmut 등): AI 생성 테스트가 코드를 실제로 검증하는지 확인. 느리므로 변경된 함수에만 적용.
+4. 리소스 누수 검사: `-W error::ResourceWarning`, 실행 전후 열린 fd 수 비교(openat2 fd, SQLite 연결, 예외 경로 포함).
+5. 정적 게이트: 현재 ruff select는 `E,F,I,UP,B`로 보안 규칙 `S`가 없고 타입 검사기가 없다. ruff `S` 추가 + pyright(또는 mypy) 도입 후보.
+6. 시간 한도·증가율 테스트: 메모리와 같은 방식(고정 입력, 증가율, 중앙값)으로 CPU/실행 시간 검사.
+7. 변경 줄 커버리지(diff-cover 등): 새 코드가 테스트에서 실제로 실행되는지 확인.
+8. 장애 주입: DB 쓰기 실패(기존 trigger 방식 확장), 쓰기 도중 프로세스 종료 후 재시작 정합성.
+
+### 재개 순서 (2026-09-14 기준, 아래 "오늘 종료 시점 요약"의 "다음 시작점"보다 우선)
+
+1. 코드 리뷰 선행 수정 3건(`PatchStore.propose` base binding, 등록 저장소 삭제 시 정책 로드 실패, 정상 브랜치 `head_state`) + 각 회귀 테스트.
+2. 같은 시점에 부담이 작은 품질 기준 도입: 추가 검사 후보 1번(요구사항 ID ↔ 테스트 매핑)과 5번(ruff `S` 규칙, pyright/mypy). 이후 모든 작업의 기준이 된다.
+3. Safe Git object/index adapter(기존 1단계).
+- 병행 확인: WSL/Linux 실행 환경 확보. Linux 전용 보안 코드(openat2, 스캐너, FileArtifacts, `require_linux_store`, `load_policy`)는 아직 실행 검증이 없고, sandbox·cgroup 메모리 측정 루프도 Linux/docker가 필요하다. 이 환경이 막히면 위 흐름의 측정 단계가 진행되지 않는다.
+- 판단 기준: 이 흐름은 개발 품질(Claude/Codex로 code-agent를 만드는 과정)을 높이는 기준이다. 제품이 기업용 수준인지는 별도로 평가 세트(로컬 단독/+Potpie/+Ponytail/+둘 다/상한 모델) 성공률로 판단하며, 측정 전 달성으로 기록하지 않는다.
+
+## 2026-09-14 코드 리뷰 결과: Safe Git adapter 착수 전 선행 수정 항목
+
+- 사용자 요청으로 기록. 이 문서에 "완료"로 기록된 범위만 기준으로 code-agent를 읽기 전용 리뷰했다. 코드 수정은 하지 않았다.
+- 테스트 재확인(2026-09-14): 129 passed / Linux-only 5 skipped. 이 PC에서 기본 설정으로 실행하면 `%TEMP%\pytest-of-<user>` 접근 권한 오류로 45 errors가 나며, `--basetemp`를 다른 폴더로 지정하면 전부 통과한다. 코드 결함이 아닌 환경 문제다.
+- 주의: 아래 결함은 기존 129개 테스트를 모두 통과한 상태에서 발견됐다. 테스트가 코드와 같은 생성 과정에서 나와 일관성은 확인하지만 정확성은 보장하지 못한다.
+
+### 완료 범위 안의 결함 (Safe Git adapter 전에 먼저 수정)
+
+| 우선 | 문제 | 위치 |
+|---|---|---|
+| 높음 | `PatchStore.propose()`가 임의 dict proposal을 받고, 인자 `base_commit`·`source_snapshot_hash`·`intent_id`·repository와 proposal 내부 base의 일치를 검사하지 않는다. "base-bound proposal 저장 완료" 기록과 불일치. `CanonicalProposal`을 받아 base 값을 거기서 도출하는 방향. | `src/kh_agent/store/patches.py:74-186` |
+| 높음 | 정책 파일이 있으면 `load_policy`가 등록된 모든 저장소를 `resolve(strict=True)`하므로, 등록 저장소 하나가 삭제·이동되면 다른 저장소 명령까지 `INVALID_INPUT_OR_ENVIRONMENT`로 실패한다. 이 로드는 identity/ACL 검사보다 먼저 실행된다. | `src/kh_agent/cli/app.py:68-77`, `src/kh_agent/security/policy.py:142` |
+| 중간 | 정상 브랜치 HEAD도 `head_state`가 `UNRESOLVED`로 남는다(`NORMAL` 설정 없음). 설계 12.4.2의 UNRESOLVED 의미(손상/검사 실패)와 다르고 정상·unborn·ref 없음을 구분할 수 없다. 정상 경우 assert 테스트 없음. 다음 Safe Git 단계가 이 값을 이어받는다. | `src/kh_agent/repository/metadata.py:35-56` |
+| 중간 | `impact`가 파일 경로를 그대로 모듈명으로 써서 `src/` 레이아웃(`src.pkg.mod`)에서 후보 0개, `from pkg import mod`는 `pkg`만 기록해 누락. | `src/kh_agent/analysis/python_graph.py:82-85,165` |
+| 중간 | 스캐너가 권한 없는 파일 하나에 전체 실패하고, 비 Python 파일까지 읽고 해시해 16MB 한도에 합산한다. 설계 12.6.3의 PARTIAL/BLOCKED 판정 대신 전체 실패. | `src/kh_agent/repository/snapshot.py:152-193` |
+| 낮음 | `final_diff_hash`와 verification plan이 audit 이벤트에 없어 재시작 검증이 이벤트만으로 해당 값을 복원·대조할 수 없다. | `src/kh_agent/store/patches.py:271-276` |
+
+- 권장: 위 표의 높음 2건과 `head_state`를 먼저 수정하고, 각 수정에 회귀 테스트(불일치 base 거부, 삭제된 등록 저장소, 정상 브랜치 `NORMAL`)를 추가한 뒤 Safe Git object/index adapter로 진행한다.
+
+### 완료된 코드지만 해당 단계에서 반영할 항목
+
+- `VerificationReadiness`의 risk/plan 참조가 저장되지 않아 `finish_verification`의 policy basis와 대조 불가(`patches.py:245-321`). 참조 저장은 지금 가능, 실제 gate 연결은 2~4단계.
+- sandbox pytest argv(`src/kh_agent/sandbox/policy.py:54-71`), 3단계 backend 구현 시 필수 수정: `python -I`는 `-E`를 포함해 `PYTHONDONTWRITEBYTECODE` 환경변수가 무시되고 cwd가 sys.path에 없어 flat-layout 프로젝트가 ImportError로 거짓 FAIL 가능. `-c /trusted/pytest.ini`로 rootdir이 `/trusted`가 됨. WSL2 기본 커널에서 AppArmor 옵션으로 docker 실행 실패 가능(확인 필요).
+- `NOT_APPLICABLE`이 비어 있지 않은 참조 문자열만으로 통과(`src/kh_agent/core/lifecycle.py:55`). M07 self-exemption 금지는 4단계에서 강제.
+
+### 결함으로 보지 않는 항목 (기존 남은 작업과 동일)
+
+- 로컬 `permissions` 테이블이 ACL 원천인 점은 설계 11.8(Spring이 원천)과 다르지만 6단계 Spring 연동 항목이다. 설계 문서에 임시 구조임을 명시할 필요가 있다.
+- dirty/index/COMPLETE, 실제 sandbox·apply, Linux 테스트 5개 미실행, dist 재빌드는 기존 1·3·5·7단계 항목이다.
+- DB 컬럼명(`shared_git_identity_key` 등), CLI 종료 코드(설계 11.13), `kh history` 보호 결과 필터링은 해당 단계에서 설계와 맞춘다.
+- blogProject(Spring/Next/FastAPI) 발견 사항(이미지 decode 메모리 고갈, 공개 RAG API 제한·timeout 부재, 게시글-벡터 트랜잭션 불일치, RAG fail-open)은 기존 앱 문제로 현재 작업 범위 밖이다.
+
+## 2026-09-14 방향 기록: Potpie/Ponytail 보완 부품과 적용 순서
+
+- 사용자 요청으로 기록. 목표는 작은 로컬 모델이 못하는 부분을 모델 밖의 결정적(trusted) 코드로 보완하는 것이다. 구현 완료나 요구사항 변경이 아니며 기존 안전 검사를 생략하는 근거가 아니다. 이번에는 문서만 갱신했고 코드·테스트는 변경하지 않았다.
+- 확인한 근거:
+  - Ponytail은 프롬프트 규칙이다. 자체 로컬 벤치마크(`Tools/ponytail/benchmarks/results/2026-06-15-llama3.2-local.md`)에서 llama3.2 3B는 코드량 감소가 오차 범위 안이었고 시간은 10~15% 느렸다. 작은 로컬 모델에서의 효과는 측정 전 가정하지 않는다.
+  - Potpie는 코드·이력·결정 맥락 그래프다. 벤치마크(`Tools/potpie/docs/context-graph/bench-plan.md`)는 그래프 품질을 측정하며 LLM/코드 수정 성공률은 비목표다. 결과는 근거 묶음이고 판단은 모델 몫이다.
+  - Potpie는 Python >=3.12 요구, code-agent는 3.11이므로 라이브러리 import가 아닌 별도 CLI/데몬 연동이 필요하다. 텔레메트리는 opt-in 기본 비활성이나 GitHub/Linear 연동·로그인·reconciliation LLM provider의 외부 통신 여부는 검증이 필요하다.
+  - 현재 LM Studio 로드 설정은 `--context-length 8192`(`blogProject/blogProject-main/start-blog.ps1:82`)로, Potpie 근거 + 코드 + 규칙 + 테스트 출력을 담기 부족하다.
+- 부품별 약점:
+  - 로컬 모델: 추론·수정 능력 한계, 문맥 8K, diff 형식 오류.
+  - Potpie: 넓은 관련성은 제공하나 정확한 호출 관계가 약하고 결과가 길며 검증하지 않는다.
+  - Ponytail: 강제력이 없어 작은 모델이 무시할 수 있고 정확성을 보장하지 않는다.
+  - code-agent: 테스트가 코드와 같은 생성 과정에서 나오며 영향 분석이 import 이름 매칭 수준이다.
+- 보완 부품 후보(권장 순서):
+  1. 실행 피드백 루프(직접 구현): 수정 → sandbox 테스트 → 실패 요약 → 최대 N회 재수정. `sandbox/policy.py` pytest 계획을 실행하는 최소 러너부터.
+  2. 수정 형식 전환 + 출력 형식 강제(직접 구현): 현재 `patch/canonical.py`는 파일 전체 content를 받는다. 모델은 search/replace 또는 함수 단위 교체만 출력하고 trusted 코드가 canonical 전체 content로 변환한다. LM Studio/llama.cpp 구조화 출력(JSON schema/grammar)으로 형식 오류를 차단한다.
+  3. 독립 검증(직접 구현): fail-to-pass(수정 전 실패·후 통과) + pass-to-pass(기존 테스트 유지) + ruff/pyright/컴파일 검사. 처음부터 통과하는 생성 테스트를 근거로 인정하지 않는다.
+  4. 다중 후보 + 테스트 선택(직접 구현): 3~5개 패치 생성 후 통과한 것 중 최소 diff 선택. Ponytail을 프롬프트가 아닌 선택 기준으로 사용. 비용은 시간.
+  5. 문맥 패커(직접 구현): Potpie 결과 + LSP 참조 + 대상 코드를 우선순위·토큰 예산으로 압축, 시그니처 요약(repo map 방식), 로컬 reranker로 Potpie 결과 재정렬(BGE-M3 환경 재사용).
+  6. 정확한 코드 탐색(도입): jedi/pyright 기반 정의·참조·호출처. Potpie는 넓은 관련성, LSP는 정확한 관계로 역할 분리. `impact`의 import 이름 매칭 대체 후보.
+  7. Ponytail 강제 검사(직접 구현, Post-Apply Guardrail): 추가 줄 수 상한, 새 의존성 감지, 복잡도 증가 검사. 모델의 지시 준수와 무관하게 측정으로 거절.
+  8. 실패 기억(Potpie 활용): 실패 원인·수정 패턴을 `potpie record`로 저장해 이후 맥락에 재주입.
+  9. 모델 역할 분리(설정): 계획·검색 요약은 소형 모델, 수정은 16GB에 맞는 양자화 코딩 특화 모델. 평가 세트로 선택.
+- 넣지 않을 것: 복잡한 멀티 에이전트 프레임워크. 작은 모델에서 단계가 늘면 오류가 누적되므로 판단은 결정적 코드에 둔다.
+- 평가 방식: 실제 버그 사례 20~50개로 로컬 단독 / +Potpie / +Ponytail / +둘 다 / 참고용 상한 모델을 같은 조건에서 비교한다. 부품은 하나씩 켜고 끄며 성공률·회귀·재시도·시간을 기록하고, 효과가 없으면 제거한다. 1~3번까지가 "모델 → 수정 → 테스트 → 재수정"이 도는 최소 제품 기준이다.
+
+## 2026-09-14 방향 결정: 현재 Local-Only 유지
+
+- 사용자 결정: 현재 v1.10은 기존 M08의 Local-Only 정책을 유지한다. 외부 LLM/embedding/web search 허용 기능을 이번 구현 범위에 추가하지 않는다.
+- Local-Only는 현재 제품의 정책과 완료 목표다. 실제 전체 runtime의 외부 통신 차단 검증이 완료됐다는 뜻은 아니다. 모델 주소 검증, offline 모델 로딩, 앱/모델/테스트 프로세스의 egress 강제 및 실패 시 실행 차단을 구현·검증해야 한다.
+- 후속 확장 방향: 사용자가 프로젝트/파일/데이터별 보호 등급을 지정하고, 명시적으로 외부 전송을 허용한 데이터만 지정된 외부 서비스에서 처리하는 정책을 검토한다. 보호 대상은 로컬 또는 허가된 사내 환경에서만 처리한다.
+- 후속 정책은 원본뿐 아니라 파생 프롬프트·코드 조각·답변·패치·로그에도 보호 등급을 전파해야 한다. 보호/허용 데이터가 섞이거나 분류가 불명확하면 외부 전송을 차단한다. 전송 대상·범위·현재 권한·명시적 승인·감사 기록을 검증하며, 로컬 적용 승인을 외부 전송 승인으로 간주하지 않는다.
+- 이 확장은 검토 후보이며 구현 완료나 현재 외부 전송 허가가 아니다. 기존 freeze 요구 문서는 변경하지 않았다.
+- 제품 목표는 범용 코딩 어시스턴트로 유지한다. 구현 검증은 작은 Python 저장소의 수정→격리 테스트→diff 검토→승인·적용 흐름부터 증명하고 지원 범위를 넓히는 방향이다. 이 순서는 제안이며 전체 요구사항을 삭제하거나 완료 처리하지 않는다.
+- 이번 요청에서는 방향 기록만 갱신했다. 코드 구현 및 테스트를 재개하지 않았으며 마지막 결과는 129 passed / Linux-only 5 skipped다.
+
+## 오늘 종료 시점 요약
+
+### 2026-09-14 추가 기록: 코딩 품질을 개발 중간부터 검증
+
+- 사용자 요청으로 기록: 현재 구조는 안전한 변경 관리·검증의 기반이며, 높은 코드 생성/수정 품질을 증명한 상태가 아니다. 129개 테스트 통과는 기반 구현의 회귀 검증이지 어시스턴트의 실제 수정 성공률이 아니다.
+- 품질의 핵심 요소는 사용할 로컬 모델의 문제 해결 능력, 관련 코드·호출 관계·제약의 정확한 맥락 제공, 테스트/프로파일링 결과에 따른 재수정이다. Local-Only 정책은 유지한다.
+- 전체 기능 완성 뒤로 품질 평가를 미루지 않는다. 필요한 안전한 실행 경계를 갖춘 뒤, 작은 실제 저장소의 버그 수정과 메모리 최적화 사례로 모델→변경→격리 검증→재수정 흐름을 개발 중간부터 평가한다.
+- 같은 작업·실행 조건에서 수정 성공 여부, 기존 기능 회귀, 재시도 횟수, 처리 시간 및 최적화 전후 메모리/실행 시간을 기록한다. 모델/검색/재수정 방식을 바꿀 때 같은 평가 사례로 비교하고, 평가용 테스트를 약화해 성공으로 만들지 않는다.
+- 결과에 따라 모델·맥락 검색·재시도 방식을 조정한다. 높은 품질이나 기업 도입 수준을 측정 전에 단정하지 않는다. 현재 모델 연결 및 실제 수정 품질 평가는 미완료다.
+- 이 기록은 개발 방향 보완이며 전체 요구사항이나 안전 검사를 생략하는 승인이 아니다. 이번에는 문서만 갱신했고 코드 구현·테스트를 재개하지 않았다.
+
+- 사용자 요청으로 오늘 작업을 종료한다. 다음 사용자 재개 요청 전에는 추가 구현하지 않는다.
+- 현재 위치: 공통 저장·권한·정적 분석·패치/위험/명령/정책 기반 코드 구현 후, M02 Git 참조 조회 보강까지 완료했다. 실제 코드 수정→격리 실행→검증→승인→적용의 전체 흐름은 아직 미완료다.
+- 마지막 검증: 129 passed / Linux 전용 5 skipped, Ruff lint/format 통과. 오늘 종료 기록에서는 코드 변경이나 테스트 재실행을 하지 않았다.
+- 남은 작업은 아래 **큰 묶음 7단계**다. 설계 모듈의 완료 개수나 동일한 작업량을 뜻하지 않으며 각 단계는 여러 번의 구현으로 나눌 수 있다. 정확한 완료율·남은 일수는 아직 산정하지 않는다.
+
+| 남은 순서 | 단계 | 완료 판단 기준 |
+|---|---|---|
+| 1 | 안전한 Git 객체·인덱스·소스 검사 | 허가된 객체 출처, HEAD/index/dirty/freshness 검사와 COMPLETE source 기준 검증 |
+| 2 | 위험 근거·정책·실행 전후 검사 연결 | 실제 evidence와 정책 버전/감사 기록을 위험 판단 및 guardrail에 연결 |
+| 3 | 실제 패치 생성·격리 실행 | 안전한 worktree 변경 및 rootless sandbox 실행·격리 증명 |
+| 4 | 테스트·성능 측정·검증 확정 | 실제 runtime 결과와 소스 기준을 verification에 연결 |
+| 5 | 사용자 승인·적용·복구 | 승인한 변경만 적용하고 lock/중단 복구/postimage 검증 |
+| 6 | 기존 서비스·화면·로컬 AI 연결 | Spring 인증/ACL, Web 조회, Local LLM/Potpie 연동 검증 |
+| 7 | Linux 및 전체 인수 검증 | Linux 전용 테스트와 M11 전체 흐름 검증, 최신 배포 산출물 빌드 |
+
+- 다음 시작점: 1단계의 Safe Git object/index adapter. `src/kh_agent/repository/metadata.py`, `refs.py`, `identity.py` 및 `tests/test_repository_metadata.py`를 확인한 뒤 격리된 administrative copy와 고정 Git 명령의 경계부터 구현한다. 경로는 `blogProject/blogProject-main/code-agent/` 기준이다.
+- 재개할 때 이 파일과 `RESTART_HANDOFF.md`를 먼저 읽는다. Windows 개발은 계속할 수 있고 WSL 설치를 반복하지 않는다. 기존 `dist`는 최신 참조 조회 변경 이전 빌드다.
+
+## 사용자 요청
+
+- Knowledge Hub Code Intelligence v1.10 구현을 계속 진행한다.
+- WSL 초기화가 응답하지 않아도 코드 작성을 중단하지 않는다. 현재 Windows 작업 폴더에서 개발하고 Linux 실행 검증을 별도로 남긴다.
+- 사용량이 25% 남았을 때 진행사항을 기록한다. 현재 세션에는 계정 잔여 사용량 조회 도구가 없어 자동 임계 감지를 약속하지 않는다. 사용자가 잔여율을 알려주면 그 시점에 다시 기록한다. 중간 기록도 수시로 갱신한다.
+
+## 구현 위치와 환경
+
+- 코드: `blogProject/blogProject-main/code-agent/`
+- Python 3.11.16, 프로젝트 `.venv` 구성 완료.
+- 설치된 개발 의존성: Typer 0.27.2, pytest 9.1.1, Ruff 0.16.7, PyYAML 6.0.3. `uv.lock` 생성 완료.
+- WSL 2.7.14 / Ubuntu Running(WSL2) 등록은 확인했으나 Linux 명령 응답은 여전히 미확인. 설치를 반복하지 않는다.
+- 기존 Spring/Next.js/FastAPI 제품 코드는 아직 변경하지 않았다.
+- 현재 디렉터리와 앱 폴더는 Git checkout이 아니다. commit/PR은 생성하지 않았다.
+- 작업 폴더 내부에는 AGENTS.md가 없고 상위 사용자 홈의 `AGENTS.md`를 추가 확인했다. Potpie-informed Ponytail/full workflow 적용. Potpie 실행 파일은 PATH 및 uv tool bin에서 발견되지 않아 로컬 source/test 도구를 사용했다. 사용자 승인 없이 sub-agent를 생성하지 않는다.
+
+## 구현 및 확인된 내용
+
+- 공통 domain: typed UUID4 ID, positive revision, versioned deterministic JSON/SHA-256, filesystem path byte encoding, 상태 전이와 검증 readiness.
+- M09 기반: SQLite WAL/FULL/foreign keys, schema version, append-only audit trigger, 상태+이벤트 원자적 transaction, idempotency 충돌 처리.
+- 패치 proposal/revision 저장, 검증 plan/result/basis 저장, 필수 check 누락·소스 변동·artifact 변조 차단, 재시작 시 audit/state integrity 검사.
+- Linux 파일 artifact backend: owner-only, no-follow, fsync file/rename/directory, hash 검증, orphan 조회. 민감 artifact 암호화 키 미연결이면 차단.
+- M01 기반: Linux UID mapping(환경변수 사용자명 불신), invalid session의 OS identity fallback 금지, 등록된 canonical repository/root identity, current ACL, 권한 변경 audit.
+- CLI: doctor/init/repo register/access add-user·grant·revoke/status/history/policy-check.
+- Python static explain/impact: AST로 정의/import/call expression 추출, import-name candidate 표시, graph hash 및 DB/audit 저장.
+- Linux source scanner: openat2 NO_SYMLINKS/BENEATH/NO_XDEV, mount·nested repo·symlink·hardlink·민감 파일 제외, quota, read consistency 검사.
+- 소스 snapshot/graph는 PARTIAL로 명시. Git index/object/dirty state 및 point-in-time 전체 일관성은 아직 검증하지 못하므로 mutation authority로 사용하지 않는다.
+- M05 regular-file canonical proposal: JSON 중복/authority 필드 거부, base-bound identity, create/modify/delete, sensitive/alias/parent conflict 차단, preimage 검사, pure preview, actual manifest 비교.
+- M04 risk domain: versioned factor normalization/weights/threshold, integer ceiling 계산, missing evidence는 exact score=null 및 min/max interval, 보수적 upper-bound level, incomplete change set의 Final Risk 차단.
+- M06 command domain: pytest structured request, fixed argv/environment, forged compiled command 거부, digest-pinned/offline/non-root/read-only Docker plan. 실제 runtime execution backend가 아니다.
+- M08 YAML: SafeLoader 기반 strict duplicate/unknown/tag/anchor/alias 거부, input/depth/resource bound, 외부 owner-private 파일 로드. 예외/egress 허용 DSL은 아직 미지원.
+- Python parser에 byte/token/AST node 한도를 추가했다. source text를 실행하거나 graph DB에 원문 저장하지 않는다.
+- README, `config/policy.example.yaml`, `scripts/check-linux.sh`, dependency lock 작성 완료.
+- 이전 단계 wheel 및 source distribution 빌드 성공. wheel 내부 SQL resource 및 새 DB bootstrap 확인 완료. 이번 참조 조회 변경은 소스에 반영했으며 기존 dist에는 아직 포함되지 않는다.
+
+## 마지막 완료된 테스트
+
+명령(프로젝트 code-agent 폴더):
+
+```powershell
+.venv/Scripts/python.exe -m pytest -q
+.venv/Scripts/ruff.exe check .
+.venv/Scripts/ruff.exe format --check .
+.venv/Scripts/python.exe -m kh_agent doctor
+```
+
+- 129 passed, 5 skipped.
+- Linux 전용 artifact/openat2/source scanner 실행 테스트 5개는 Windows라 skip. 통과로 간주하지 않는다.
+- 마지막 완료된 lint/format 검사 통과.
+- 테스트에는 MemoryArtifacts/test-only scanner/runtime injection이 사용된다. Windows 테스트 통과를 Linux 파일시스템·샌드박스 검증 완료로 오인하지 않는다.
+
+## 현재 체크포인트
+
+- 기존 106개 테스트에 Git 참조·읽기 일관성 회귀 테스트 23개를 추가했다.
+- 2026-09-13 단계별 진행: loose ref 우선 / packed-refs fallback, SHA-1·SHA-256 선언 ID, peeled record 검사, 참조 경로·중복·4 MiB 한도 검사를 구현했다.
+- 공통 metadata reader는 읽기 전후 fstat와 최종 경로 identity/크기/시간을 비교하며 hardlink/alias/special file을 차단한다. Linux O_NONBLOCK으로 FIFO open 대기를 방지한다.
+- HEAD/ref 재조회로 변경과 없던 loose ref 생성을 감지한다. 원자적 repository snapshot, 객체 존재, dirty 상태를 증명하지 않는다. commit_sha/working_tree_dirty는 여전히 null, mutation_ready는 false다.
+- 전체 테스트 및 lint/format을 확인했다. dist는 이전 단계 빌드이므로 최신 소스 배포 시 재빌드가 필요하다.
+- 잔여 사용량 25% 아래에서도 재개할 수 있도록 매 단계 기록한다. 계정 잔여율은 직접 조회할 수 없다.
+
+## 남은 주요 작업
+
+1. M02 다음 단계: native Git을 격리된 administrative copy에서 고정 명령으로 실행하는 adapter와 object/index 검사. source config/hook/filter/외부 object store를 실행·참조하지 않도록 경계를 먼저 구현한다. packed object/object source authorization, dirty/index/materialization, freshness 및 COMPLETE source 기준은 미완료. 현재 metadata 참조 조회만 구현했으며 symbolic ref chain/reftable도 미지원이다.
+2. M04 실제 evidence provider 및 M06 Pre/Post guardrail 통합, trusted policy 변경 audit/version lifecycle 보강.
+3. M05 실제 안전한 worktree materialization/mutation, M06 rootless isolated backend와 runtime attestation.
+4. M07 runtime test/profiling/benchmark, finalized verification 기준 연결.
+5. Informed approval binding, 실제 apply/lock/durable intent/recovery 및 postimage 검증.
+6. Spring 인증/ACL bridge와 Web query projection, Local LLM/Potpie 검증된 local-only 연동.
+7. Linux 실행 테스트 및 M11 전체 acceptance. 문서 검증 86건을 제품 테스트 결과로 사용하지 않는다.
+
+전체 v1.10 구현 완료 상태가 아니다. `modify/profile/optimize/verify/apply` CLI는 아직 CAPABILITY_NOT_AVAILABLE로 차단된다. DB 내부 persistence API가 있다고 실제 검증·승인·적용 기능이 완성된 것은 아니다.
