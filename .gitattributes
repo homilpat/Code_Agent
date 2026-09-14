@@ -1,0 +1,3 @@
+# Frozen requirement set is verified byte-for-byte by docs/requirements/SHA256SUMS.txt.
+# Disable line-ending conversion so checkouts on Windows keep the hashes valid.
+docs/requirements/** -text
