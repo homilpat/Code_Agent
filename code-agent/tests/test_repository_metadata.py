@@ -1,4 +1,7 @@
 import os
+import sys
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -117,6 +120,28 @@ def test_metadata_change_during_read_is_blocked(tmp_path, monkeypatch):
     monkeypatch.setattr(identity_module.os, "fstat", changing_stat)
     with pytest.raises(DomainError):
         read_metadata(path)
+
+
+@pytest.mark.parametrize("field", ["st_ctime_ns", "st_mtime_ns"])
+def test_path_stat_ctime_lag_tolerated_only_off_linux(tmp_path, monkeypatch, field):
+    path = tmp_path / "HEAD"
+    path.write_bytes(b"a" * 40)
+    real_lstat = Path.lstat
+    names = ("st_dev", "st_ino", "st_mode", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns")
+
+    def lagging_lstat(self, *args, **kwargs):
+        value = real_lstat(self, *args, **kwargs)
+        fields = {name: getattr(value, name) for name in names}
+        fields["st_file_attributes"] = getattr(value, "st_file_attributes", 0)
+        fields[field] -= 1_000_000
+        return SimpleNamespace(**fields)
+
+    monkeypatch.setattr(Path, "lstat", lagging_lstat)
+    if field == "st_ctime_ns" and sys.platform != "linux":
+        assert read_metadata(path) == b"a" * 40
+    else:
+        with pytest.raises(DomainError):
+            read_metadata(path)
 
 
 def test_hardlinked_metadata_blocked(tmp_path):
