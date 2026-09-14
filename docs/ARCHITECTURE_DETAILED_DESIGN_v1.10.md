@@ -200,6 +200,53 @@ rag-fastapi
 
 외부 LLM / embedding / web search provider는 Code Intelligence 경로에서 기본 금지한다.
 
+## 4.4 Target Language Architecture
+
+Code Agent의 **구현 언어는 Python**이지만, 분석·수정 대상 언어를 Python으로 고정하지 않는다. Target language support는 trusted registry와 adapter capability로 분리한다.
+
+```text
+Target Repository
+      │
+      ▼
+LanguageSupportCatalog
+      │
+      ├─ StructuralLanguageRegistry     # M02가 소비
+      │    └─ StructuralLanguageAdapter
+      │         ├─ Python
+      │         ├─ ECMAScript (TS/TSX/JS/JSX/MJS/CJS)
+      │         └─ Java
+      │
+      └─ LanguageToolchainRegistry      # M06/M07가 소비
+           └─ LanguageToolchainAdapter
+                ├─ Python toolchain
+                ├─ Node/TypeScript toolchain
+                └─ JVM toolchain
+```
+
+두 adapter는 권한 경계를 분리한다.
+
+```text
+StructuralLanguageAdapter
+→ source parse / import / symbol / syntax relation
+→ Repository code / build hook / plugin 실행 금지
+
+LanguageToolchainAdapter
+→ static/test/build/profile에 필요한 structured ToolRequest 생성
+→ raw shell 생성 금지
+→ 실제 실행은 M06 Command Policy + Sandbox만 허용
+```
+
+지원 상태는 **구조 분석(Structural) / 툴체인 실행 계획(Toolchain) / 최종 지원 상태(Effective)** 를 분리해 표현한다. 하나의 parser가 존재한다는 이유만으로 해당 언어를 end-to-end `ACTIVE`로 표시하지 않는다.
+
+| Target language | Detailed Design target | Structural | Toolchain | Effective | 현재 저장소 구현 상태 |
+|---|---|---|---|---|---|
+| Python | v1 primary | **PARTIAL** | **PARTIAL** | **PARTIAL** | stdlib AST graph / Python explain은 구현됐지만 아직 `StructuralLanguageRegistry/Adapter` migration·conformance가 완료되지 않음. 제한된 pytest command compile/Docker plan은 존재하지만 실제 Sandbox execution backend와 full Verification/Apply 경로는 아직 없음 |
+| TypeScript / JavaScript | phase 2 | **PLANNED** | **PLANNED** | **PLANNED** | adapter 계약만 설계, runtime 등록/실행 구현 없음 |
+| Java | phase 3 | **PLANNED** | **PLANNED** | **PLANNED** | adapter 계약과 profiling/verification 경로만 설계, runtime 등록/실행 구현 없음 |
+| 기타 | extension | **UNSUPPORTED** 또는 **PARTIAL** | **UNSUPPORTED** | **UNSUPPORTED/PARTIAL** | SourceSnapshot에는 포함될 수 있으나 structural/toolchain capability가 없으면 완전 지원으로 승격하지 않음 |
+
+현재 구현이 Python 중심이라는 사실을 숨기지 않는다. 현재 CLI `doctor`의 Python 분석 capability가 `PYTHON_STATIC_PARTIAL_LINUX_ONLY`이고 Sandbox/Approval/Apply가 아직 불가하므로 **Python의 effective language support는 `PARTIAL`** 로 본다. 현재 Python AST/graph 기능은 존재하지만 새 `StructuralLanguageAdapter/Registry` 계약으로의 migration·trusted registration·conformance가 아직 완료되지 않았으므로 Structural layer도 현재는 `PARTIAL`이다. 해당 migration과 conformance가 완료된 뒤에만 Structural status를 `ACTIVE`로 승격한다. TS/JS/Java adapter가 구현되기 전에는 해당 언어의 behavior-changing Patch를 완전 검증했다고 주장하지 않으며 required capability가 없으면 M07에서 `NOT_AVAILABLE`/`INCONCLUSIVE`로 처리한다.
+
 ---
 
 # 5. IPC Boundary
@@ -506,6 +553,62 @@ SandboxRunId
 ```
 
 UUID 문자열을 arbitrary code에서 직접 생성하기보다 typed wrapper / factory를 사용한다.
+
+Target language 공통 값도 shared domain으로 둔다.
+
+```python
+class LanguageId(StrEnum):
+    PYTHON = "PYTHON"
+    TYPESCRIPT = "TYPESCRIPT"
+    JAVASCRIPT = "JAVASCRIPT"
+    JAVA = "JAVA"
+    UNKNOWN = "UNKNOWN"
+
+
+class LanguageFamily(StrEnum):
+    PYTHON = "PYTHON"
+    ECMASCRIPT = "ECMASCRIPT"
+    JVM = "JVM"
+    UNKNOWN = "UNKNOWN"
+
+
+class LanguageCapability(StrEnum):
+    STRUCTURAL_PARSE = "STRUCTURAL_PARSE"
+    SYMBOL_RESOLUTION = "SYMBOL_RESOLUTION"
+    TEST_DISCOVERY = "TEST_DISCOVERY"
+    STATIC_CHECK = "STATIC_CHECK"
+    BUILD = "BUILD"
+    UNIT_TEST = "UNIT_TEST"
+    INTEGRATION_TEST = "INTEGRATION_TEST"
+    CPU_PROFILE = "CPU_PROFILE"
+    MEMORY_PROFILE = "MEMORY_PROFILE"
+    BENCHMARK = "BENCHMARK"
+
+
+class LanguageSupportStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    PARTIAL = "PARTIAL"
+    PLANNED = "PLANNED"
+    UNSUPPORTED = "UNSUPPORTED"
+```
+
+상태 의미:
+
+```text
+ACTIVE
+→ 해당 layer의 adapter가 구현·trusted registry 등록·conformance 확인까지 완료됨
+
+PARTIAL
+→ 일부 capability는 실제 사용 가능하지만 해당 layer 또는 end-to-end 필수 capability가 빠져 있음
+
+PLANNED
+→ Detailed Design target일 뿐 runtime capability가 아님
+
+UNSUPPORTED
+→ 해당 language/layer에 trusted adapter contract 구현 또는 등록이 없음
+```
+
+동일 언어라도 `structural_status`, `toolchain_status`, `effective_status`가 다를 수 있다. 실행 시에는 등록된 adapter + conformance result + toolchain availability가 실제 capability authority다.
 
 ---
 
@@ -1729,6 +1832,16 @@ RepositoryContextService
 SourceSnapshotReference
           │
           ▼
+StructuralLanguageRegistry
+          │
+          ├── PythonStructuralAdapter
+          ├── ECMAScriptStructuralAdapter      # planned
+          └── JavaStructuralAdapter            # planned
+          │
+          ▼
+Normalized Structural Evidence
+          │
+          ▼
 GraphCoordinator
           │
           ├── StaticGraphProvider
@@ -1793,7 +1906,26 @@ code-agent/
     └── persistence/
         ├── sqlite_repository_store.py
         └── manifest_artifact_store.py
+
+code-agent/
+└── languages/
+    ├── domain.py
+    ├── registry.py
+    ├── ports/
+    │   ├── structural.py
+    │   └── toolchain.py
+    ├── python/
+    │   ├── structural.py
+    │   └── capabilities.py
+    ├── ecmascript/
+    │   ├── structural.py
+    │   └── capabilities.py
+    └── java/
+        ├── structural.py
+        └── capabilities.py
 ```
+
+현재 `analysis/python_graph.py` 구현은 폐기하지 않고 `PythonStructuralAdapter`가 감싸는 첫 implementation으로 사용한 뒤 점진적으로 adapter package로 이동한다. 새 추상화를 도입한다는 이유로 이미 검증된 Python AST 로직을 즉시 재작성하지 않는다.
 
 M01의 Repository discovery와 M05의 Safe Git Worktree 준비는 별도 `git` wrapper를 만들지 않고 공통 Safe Git primitives를 재사용한다. 단, M02는 inspection-only method만 소비한다.
 
@@ -1852,6 +1984,8 @@ class HeadState(StrEnum):
 ```
 
 `UNRESOLVED`는 repository metadata 손상, required local object 부재 또는 Safe Git inspection 실패로 HEAD 의미를 확정할 수 없는 경우 사용한다.
+
+`UNBORN`은 `HEAD`가 유효한 `refs/heads/<branch>`를 가리키지만 해당 branch ref가 아직 존재하지 않고 첫 commit 이전이라는 사실을 safe metadata/object Evidence로 확인한 경우다. 단순 ref 누락을 모두 `UNBORN`으로 추정하지 않는다. 현재 저장소 구현의 `MetadataInspector`는 이 상태를 아직 `UNRESOLVED`와 구분하지 못하므로 **known implementation gap**으로 기록하고, `M02-CTX-003`을 충족하기 전 mutation readiness를 부여하지 않는다.
 
 ### 12.4.3 GitOperationState
 
@@ -2491,32 +2625,83 @@ Sensitive content를 Graph/ingestion context에 포함하려면 M08의 scoped `r
 
 ---
 
-## 12.15 Language Detection
+## 12.15 Language Detection / Support Registry
 
 Language detection은 다음 Evidence를 조합한다.
 
 ```text
 file extension / filename
-parser capability
-project metadata
+trusted structural adapter capability
+project metadata (read-only)
 source shebang (bounded read가 허용된 경우)
 ```
 
-Repository-controlled build command를 실행하여 언어를 탐지하지 않는다.
+Repository-controlled build command를 실행하여 언어를 탐지하지 않는다. `package.json`, `tsconfig.json`, `pom.xml`, `build.gradle` 같은 metadata는 detection/capability 후보 Evidence일 뿐, command/network/security authority가 아니다.
 
-결과:
+언어 family mapping:
+
+```text
+.py / .pyi                           → PYTHON
+.ts / .tsx / .mts / .cts            → TYPESCRIPT
+.js / .jsx / .mjs / .cjs            → JAVASCRIPT
+.java                                → JAVA
+```
+
+TypeScript/JavaScript는 실행 도구 관점에서 `ECMAScript` family로 묶을 수 있지만 source identity에는 원래 `LanguageId`를 유지한다.
 
 ```python
 @dataclass(frozen=True)
 class DetectedLanguage:
-    language: str
+    language: LanguageId
+    family: LanguageFamily
     file_count: int
     source_bytes: int
     confidence: float
+    structural_status: LanguageSupportStatus
+    toolchain_status: LanguageSupportStatus
+    effective_status: LanguageSupportStatus
+    capabilities: frozenset[LanguageCapability]
+    structural_adapter_id: str | None
+    structural_adapter_version: str | None
+    toolchain_adapter_id: str | None
+    toolchain_adapter_version: str | None
     evidence_codes: tuple[str, ...]
 ```
 
-Unknown file은 억지로 특정 language로 매핑하지 않는다.
+Unknown file은 억지로 특정 language로 매핑하지 않는다. Adapter가 없는 언어도 SourceSnapshot에는 포함될 수 있으나 structural graph coverage는 `PARTIAL`로 계산한다.
+
+### 12.15.1 StructuralLanguageRegistry
+
+```python
+class StructuralLanguageRegistry(Protocol):
+    def resolve(
+        self,
+        language: LanguageId,
+    ) -> StructuralLanguageAdapter | None: ...
+
+    def structural_capabilities(
+        self,
+        language: LanguageId,
+    ) -> frozenset[LanguageCapability]: ...
+```
+
+M02에는 이 structural-only port만 주입한다. M02 code path에서는 `LanguageToolchainAdapter`, command template registry, executable path를 resolve할 수 없다.
+
+Registry 자체가 trusted configuration이다. Repository source가 임의 adapter/plugin path를 등록하거나 새로운 structural/executable capability를 self-authorize할 수 없다.
+
+### 12.15.2 Multi-language Repository
+
+Repository는 하나의 primary language만 가진다고 가정하지 않는다.
+
+```text
+Spring + Next.js + Python repository
+→ JAVA + TYPESCRIPT/JAVASCRIPT + PYTHON을 동시에 탐지
+→ language별 structural result 생성
+→ normalized graph에 병합
+→ cross-language relation은 명시 Evidence가 있을 때만 연결
+```
+
+REST endpoint ↔ frontend call, JNI, subprocess, generated client와 같은 cross-language relation은 단순 이름 유사성만으로 authoritative edge를 만들지 않는다. OpenAPI/schema/import/config 또는 runtime Evidence가 존재할 때 `DEPENDS_ON/CROSSES_EXTERNAL_BOUNDARY` 등으로 연결하고 provenance를 보존한다.
 
 ---
 
@@ -2547,6 +2732,7 @@ class GraphSnapshotReference:
     graph_snapshot_schema_version: str
     graph_ingestion_policy_version: str
     graph_builder_version: str
+    language_adapter_set_hash: str
 
     graph_data_ref: GraphDataRef
     graph_artifact_ref: ArtifactRef | None
@@ -2629,7 +2815,55 @@ CROSSES_EXTERNAL_BOUNDARY
 
 ---
 
-## 12.17 Graph Provider Interfaces
+## 12.17 Language / Graph Provider Interfaces
+
+M02의 language-specific 로직은 **non-executing structural adapter**로 제한한다.
+
+```python
+class StructuralLanguageAdapter(Protocol):
+    adapter_id: str
+    adapter_version: str
+    languages: frozenset[LanguageId]
+
+    def parse_file(
+        self,
+        source: SecureSourceView,
+    ) -> StructuralFileEvidence: ...
+
+    def build_relations(
+        self,
+        files: tuple[StructuralFileEvidence, ...],
+        metadata: TrustedProjectMetadataView,
+    ) -> LanguageGraphResult: ...
+
+    def resolve_symbol(
+        self,
+        query: SymbolQuery,
+        graph: LanguageGraphResult,
+    ) -> SymbolResolutionResult: ...
+```
+
+이 interface 구현은 Repository code, package script, compiler plugin, annotation processor, build hook을 실행하지 않는다. 그런 semantic/runtime 분석이 필요한 경우 M06/M07의 `LanguageToolchainAdapter` 경계로 넘긴다.
+
+현재/계획 adapter:
+
+```text
+PythonStructuralAdapter
+→ 현재 `analysis/python_graph.py` stdlib AST 기반 implementation 재사용
+→ import / class / function / call-expression structural evidence
+
+ECMAScriptStructuralAdapter (planned)
+→ TS/JS/TSX/JSX/MJS/CJS
+→ non-executing trusted parser(Tree-sitter 계열 우선)로 syntax/import/export/symbol evidence
+→ tsserver/TypeScript semantic resolution은 Host M02가 아니라 sandbox-backed toolchain 경로
+
+JavaStructuralAdapter (planned)
+→ .java syntax/import/type/method evidence
+→ non-executing trusted parser(Tree-sitter 계열 우선)
+→ JDT LS / annotation-processing-aware semantic resolution은 sandbox-backed toolchain 경로
+```
+
+Graph provider는 language adapter 결과를 normalized graph로 합성한다.
 
 ```python
 class CodeGraphProvider(Protocol):
@@ -2640,6 +2874,7 @@ class CodeGraphProvider(Protocol):
         self,
         snapshot: SourceSnapshotReference,
         manifest: SourceManifestView,
+        languages: tuple[DetectedLanguage, ...],
     ) -> GraphBuildResult: ...
 
     def refresh(
@@ -2652,7 +2887,7 @@ class CodeGraphProvider(Protocol):
 
 Provider는 source body가 필요할 때 `SecureSourceReader`를 통해서만 읽는다. Arbitrary path open을 허용하지 않는다.
 
-Repository code / plugin / project command를 실행할 가능성이 있는 provider는 이 interface의 Host-side implementation으로 등록하지 않고 M06 sandbox-backed provider로 분리한다.
+Repository code / plugin / project command를 실행할 가능성이 있는 provider는 Host-side structural implementation으로 등록하지 않고 M06 sandbox-backed provider/toolchain 경로로 분리한다.
 
 ---
 
@@ -2679,6 +2914,15 @@ Source Snapshot
 ```
 
 Static parser가 호출관계를 확정할 수 없는 언어/패턴에서는 LLM 추측으로 `CALLS` authoritative edge를 만들지 않는다.
+
+Language-specific raw AST를 그대로 공통 graph contract로 노출하지 않고 다음 normalized relation으로 변환한다.
+
+```text
+FILE / MODULE / CLASS / INTERFACE / FUNCTION / METHOD / TEST
+DEFINES / IMPORTS / REFERENCES / EXTENDS / IMPLEMENTS / CALLS / TESTS
+```
+
+언어 adapter capability가 없는 source entry는 silently drop하지 않는다. `unsupported_entry_count / unsupported_language_set`을 Graph coverage에 기록하여 `COMPLETE` 오판을 막는다.
 
 ---
 
@@ -2805,6 +3049,7 @@ AND graph_working_tree_diff_hash == current.working_tree_diff_hash
 AND graph_ingestion_policy_version == current ingestion policy version
 AND graph schema semantics compatible
 AND graph builder semantics compatible
+AND graph language_adapter_set_hash == current trusted structural adapter set hash
 AND covered_source_scope_hash == current.source_scope_hash
 ```
 
@@ -2878,6 +3123,7 @@ Symbol rename은 증명 가능한 parser evidence가 없으면 delete+add로 처
 ingestion policy semantics changed
 snapshot schema/path identity semantics changed
 graph builder major semantics changed
+structural language adapter/version/capability set changed
 large change threshold 초과
 nested repository boundary changed
 source completeness PARTIAL → COMPLETE 또는 COMPLETE → PARTIAL
@@ -3043,6 +3289,7 @@ CREATE TABLE graph_snapshots (
     graph_snapshot_schema_version TEXT NOT NULL,
     graph_ingestion_policy_version TEXT NOT NULL,
     graph_builder_version TEXT NOT NULL,
+    language_adapter_set_hash TEXT NOT NULL,
 
     covered_source_scope_hash TEXT NOT NULL,
     covered_entry_count INTEGER NOT NULL,
@@ -3437,7 +3684,24 @@ M02-POT-005 Potpie conflicts with current source → source wins
 M02-POT-006 Potpie unavailable → no false FRESH/COMPLETE claim
 ```
 
-### 12.35.7 Parser / Resource Safety
+### 12.35.7 Language Adapter / Multi-language
+
+```text
+M02-LNG-001 current Python AST implementation is wrapped without semantic regression
+M02-LNG-002 .ts/.tsx/.mts/.cts map to TYPESCRIPT and ECMAScript family
+M02-LNG-003 .js/.jsx/.mjs/.cjs map to JAVASCRIPT and ECMAScript family
+M02-LNG-004 .java maps to JAVA
+M02-LNG-005 unsupported language remains in SourceSnapshot but graph coverage becomes PARTIAL
+M02-LNG-006 repository cannot register arbitrary language adapter/plugin
+M02-LNG-007 TS/JS structural adapter never executes package.json scripts
+M02-LNG-008 Java structural adapter never executes Gradle/Maven/plugin/annotation processor
+M02-LNG-009 mixed Python+TS+Java repository merges normalized graph without dropping language scope
+M02-LNG-010 cross-language edge requires explicit schema/config/runtime evidence
+M02-LNG-011 semantic LSP request is routed through M06, never Host-side M02 execution
+M02-LNG-012 adapter version change invalidates affected graph freshness
+```
+
+### 12.35.8 Parser / Resource Safety
 
 ```text
 M02-PRS-001 malformed source does not crash agent
@@ -3467,6 +3731,8 @@ M02-PRS-005 unusual filename/newline/leading dash handled as structured data
 | Incremental update | 12.22 |
 | File relation | 12.23 |
 | Function/method relation | 12.23 |
+| Multi-language detection / adapter boundary | 12.15, 12.17, 12.18 |
+| Unsupported language coverage / fail-conservative behavior | 12.15, 12.18, 12.35.7 |
 | Potpie Local-Only | 12.19 |
 | Structural Evidence Priority | 12.24 |
 | Web/M09 조회용 durable reference | 12.25, 12.26 |
@@ -3485,13 +3751,16 @@ M02-06 M08-integrated SecureSourceReader
 M02-07 SourceManifest canonical serializer / snapshot hash
 M02-08 M09 SourceSnapshot persistence
 M02-09 RepositoryContextService
-M02-10 static parser registry / primary graph provider
-M02-11 GraphSnapshot persistence
-M02-12 GraphFreshnessEvaluator
-M02-13 incremental ChangedSource/ChangedSymbol detection
-M02-14 Potpie local-only adapter
-M02-15 file/symbol relation query API
-M02-16 security / large-repository / cross-platform integration tests
+M02-10 StructuralLanguageRegistry + PythonStructuralAdapter wrapper
+M02-11 normalized static graph provider
+M02-12 GraphSnapshot persistence
+M02-13 GraphFreshnessEvaluator
+M02-14 incremental ChangedSource/ChangedSymbol detection
+M02-15 Potpie local-only adapter
+M02-16 file/symbol relation query API
+M02-17 ECMAScriptStructuralAdapter (TS/JS phase 2)
+M02-18 JavaStructuralAdapter (phase 3)
+M02-19 security / large-repository / cross-platform / multi-language integration tests
 ```
 
 M02-02 Safe Git primitives는 M01/M05와 공통 구현을 사용한다. M02용 편의 wrapper가 보안 profile을 우회해 일반 `git` subprocess를 만들지 않는다.
@@ -3532,23 +3801,47 @@ M02-02 Safe Git primitives는 M01/M05와 공통 구현을 사용한다. M02용 �
 10. **Snapshot/Graph durable publish ordering 보강**  
     artifact/provider persistence가 완료되지 않았는데 metadata를 먼저 authoritative COMPLETE로 노출하지 않도록 publish 순서를 명시했다.
 
-11. **Sparse / partial clone을 전체 Repository로 오인하지 않도록 수정**  
+11. **Target language와 Agent implementation language 분리**  
+    Agent Core가 Python으로 작성됐다는 사실과 분석 대상 language support를 분리했다. Python은 현재 structural/toolchain/effective support 모두 PARTIAL이며, 기존 Python AST 구현을 새 structural adapter 계약으로 migration·conformance한 뒤 해당 structural layer만 ACTIVE로 승격할 수 있다. TS/JS와 Java는 adapter contract를 가진 PLANNED capability로 명시한다.
+
+12. **M02 structural adapter와 M06/M07 toolchain adapter 분리**  
+    Java Gradle/Maven, TypeScript tsserver/Jest, Python pytest 같은 실행 경로가 M02 Host-side parser 권한으로 승격되지 않도록 non-executing structural boundary와 sandbox-backed execution boundary를 분리했다. M02에는 `StructuralLanguageRegistry`만 주입하고 toolchain registry 자체를 노출하지 않는다.
+
+13. **Unsupported language를 silent success로 처리하지 않음**  
+    source snapshot에는 남기되 graph coverage를 PARTIAL로 내리고, behavior-changing verification에서 required capability 부재를 M07 `NOT_AVAILABLE/INCONCLUSIVE`로 전달하도록 했다.
+
+14. **Multi-language graph와 cross-language edge 보수화**  
+    이름 유사성만으로 Python↔Java↔TS 호출관계를 확정하지 않고 schema/config/runtime evidence가 있을 때만 cross-language dependency edge를 authoritative evidence로 인정한다.
+
+14-A. **Language family / effective support 상태 정규화**  
+    `DetectedLanguage.family`의 자유 문자열을 `LanguageFamily` enum으로 교체하고, Python을 `ACTIVE`로 과장하지 않도록 `structural_status / toolchain_status / effective_status`를 분리했다. 현재 Python은 세 상태 모두 PARTIAL이며, structural adapter migration/conformance 완료 후 structural layer만 독립적으로 ACTIVE 승격할 수 있다. `.mts/.cts`도 TypeScript family에 포함한다.
+
+14-B. **UNBORN 구현 gap 명시**  
+    Detailed Design의 `HeadState.UNBORN`과 현재 `MetadataInspector` 구현 사이 차이를 known gap으로 기록했다. symbolic HEAD의 branch ref가 없는 경우를 무조건 `UNBORN`으로 추정하지 않고, 안전하게 확인하기 전에는 mutation readiness를 부여하지 않는다.
+
+15. **Sparse / partial clone을 전체 Repository로 오인하지 않도록 수정**  
     materialization scope와 completeness를 SourceSnapshot/Graph freshness에 연결했다.
 
-12. **Safe Git에서 implicit network와 executable integrations 차단 명시**  
+16. **Safe Git에서 implicit network와 executable integrations 차단 명시**  
     object가 없으면 자동 fetch하지 않고 PARTIAL/BLOCKED Evidence로 반환한다.
 
-13. **`git status`를 무조건 Trusted command로 두지 않음**  
+17. **`git status`를 무조건 Trusted command로 두지 않음**  
     clean/smudge/process filter나 fsmonitor 실행 가능성을 고려해, non-executing profile이 입증되지 않으면 index + filesystem evidence로 status를 합성하고 불확실한 path는 보수적으로 처리한다.
 
-14. **Durable Graph data binding 추가**  
+18. **Durable Graph data binding 추가**  
     `COMPLETE` GraphSnapshot은 restart 후에도 조회 가능한 `graph_data_ref`의 durability/integrity가 확인된 경우에만 publish하도록 했다.
 
-15. **Nested Repository authorized case도 parent graph와 분리**  
+19. **Nested Repository authorized case도 parent graph와 분리**  
     별도 ACL이 있더라도 parent snapshot에 병합하지 않고 별도 RepositoryContext로 분석하도록 경계를 명확히 했다.
 
-16. **Potpie security violation과 availability failure 분리**  
+20. **Potpie security violation과 availability failure 분리**  
     단순 장애는 secondary provider degradation으로 처리할 수 있지만 external provider/telemetry/egress 위반은 전체 Code Intelligence를 BLOCK한다.
+
+21. **Adapter version을 Graph/Verification identity에 포함**  
+    source가 같아도 structural adapter semantics가 바뀌면 기존 graph를 `FRESH`로 재사용하지 않도록 `language_adapter_set_hash`를 GraphSnapshot/DB/freshness 조건에 추가하고, Verification Basis에도 structural/toolchain adapter version set을 연결했다.
+
+22. **Multi-language Risk 누락 보강**  
+    API/cross-language boundary와 unsupported/toolchain-gap을 M04 Risk Evidence로 전달하여 adapter 부재가 안전한 0점으로 축소되지 않게 했다.
 
 이 보정 이후 M02 요구사항의 source identity / graph freshness / traversal boundary / Local-Only intent와 충돌하는 known issue는 현재 설계 범위에서 발견되지 않았다.
 
@@ -3654,6 +3947,21 @@ mode_change
 symlink
 gitlink
 runtime_hotspot
+language_boundary
+unsupported_language_evidence
+verification_toolchain_gap
+```
+
+Multi-language 변경은 단순 파일 수가 아니라 boundary 의미를 Risk Evidence에 포함한다.
+
+```text
+Spring API contract + Next.js client 동시 변경
+→ cross-language / API boundary factor
+
+behavior-changing file인데 structural/toolchain adapter 부재
+→ missing evidence로 기록
+→ 0점 처리 금지
+→ Verification Plan 보수적 확대
 ```
 
 핵심 원칙:
@@ -4161,6 +4469,65 @@ SandboxBackend
 
 ---
 
+## 24.1 LanguageToolchainAdapter
+
+언어별 test/build/static/profile 특성은 M02 structural parser와 분리하여 M06/M07가 소비하는 trusted adapter로 정의한다.
+
+```python
+class LanguageToolchainRegistry(Protocol):
+    def resolve(self, language: LanguageId) -> "LanguageToolchainAdapter | None": ...
+    def toolchain_capabilities(self, language: LanguageId) -> frozenset[LanguageCapability]: ...
+
+
+class LanguageToolchainAdapter(Protocol):
+    adapter_id: str
+    adapter_version: str
+    languages: frozenset[LanguageId]
+
+    def inspect_capabilities(
+        self,
+        metadata: TrustedProjectMetadataView,
+        baseline_inventory: BaselineToolchainInventory,
+    ) -> LanguageToolchainCapabilities: ...
+
+    def static_check_requests(self, target: VerificationTarget) -> tuple[ToolRequest, ...]: ...
+    def unit_test_requests(self, target: VerificationTarget) -> tuple[ToolRequest, ...]: ...
+    def build_requests(self, target: VerificationTarget) -> tuple[ToolRequest, ...]: ...
+    def profile_requests(self, target: ProfilingTarget) -> tuple[ToolRequest, ...]: ...
+```
+
+`LanguageToolchainRegistry`는 M06/M07 trusted wiring에서만 제공하고 M02에는 노출하지 않는다. Adapter는 command를 실행하지 않고 registered `ToolRequest`만 생성한다. Repository의 `package.json scripts`, Gradle task, Maven plugin 선언은 capability/evidence 후보일 뿐 자동 실행 authority가 아니다.
+
+언어별 계획:
+
+```text
+Python
+├─ static: ruff + trusted type checker(mypy/pyright policy에 따라)
+├─ test: pytest
+├─ CPU: cProfile, process CPU, optional py-spy profiling profile
+└─ memory: tracemalloc, ru_maxrss/cgroup memory.peak, optional memray/Scalene
+
+TypeScript / JavaScript
+├─ static: trusted tsc --noEmit / ESLint template
+├─ semantic: tsserver/TypeScript service in sandbox
+├─ test: Jest/Vitest registered template
+├─ build: trusted Node toolchain template; arbitrary npm script direct execution 금지
+│          (필요한 project script는 explicit pre-registration + sandbox execution만 허용)
+└─ profile: Node/V8 CPU profile + heap profile/snapshot + cgroup peak
+
+Java
+├─ static/semantic: JDT LS or trusted compiler/static analyzer in sandbox
+├─ test: JUnit via trusted Maven/Gradle toolchain template
+├─ build: pinned Maven/Gradle binary; repository wrapper script를 Host에서 직접 실행 금지
+│          wrapper metadata/version은 Evidence로 읽고, 필요한 project build는 sandbox에서 trusted binary/template로 실행
+├─ CPU/runtime: JFR / process CPU
+└─ memory: GC log / JFR / optional heap dump protected artifact
+```
+
+Java annotation processor, Gradle/Maven plugin, Node loader/plugin처럼 project code를 실행할 수 있는 기능은 전부 untrusted project execution으로 취급하여 M06 Sandbox를 우회하지 않는다.
+
+---
+
 # 25. Command Template Registry
 
 Repository 내부 config는 test/build command를 제안할 수 있으나 authority가 아니다.
@@ -4168,23 +4535,41 @@ Repository 내부 config는 test/build command를 제안할 수 있으나 author
 Trusted registry 예:
 
 ```text
-pytest
-python -m pytest
-ruff
-mypy
-coverage
-registered build command
-registered benchmark command
+Python
+  pytest / python -m pytest
+  ruff
+  mypy / pyright
+  coverage
+
+TypeScript / JavaScript
+  tsc --noEmit
+  eslint
+  jest / vitest
+  trusted Node build template
+
+Java
+  trusted Maven test/build template
+  trusted Gradle test/build template
+  JUnit-oriented test selector
+  JFR / GC logging profile template
+
+Common
+  registered benchmark command
 ```
+
+현재 저장소 구현은 `python-pytest-v1`만 실제 compile path가 존재한다. 위 TS/JS/Java 항목은 Detailed Design target이며 template implementation/conformance test 전에는 runtime registry에 등록하지 않는다.
 
 각 template는 최소 다음을 갖는다.
 
 ```text
 template_id
 version
-executable
+language / language_family
+executable / trusted binary digest-or-image binding
 allowed arguments
 path argument rules
+project metadata constraints
+toolchain fingerprint requirement
 timeout ceiling
 sandbox profile
 network requirement
@@ -4419,6 +4804,60 @@ Performance/OPTIMIZE required benchmark는 반복 측정, warmup, dataset hash, 
 
 ---
 
+## 30.1 Multi-language Verification Planning
+
+`VerificationPlanner`는 Repository의 대표 언어 하나가 아니라 **Canonical Actual Change Set이 건드린 language set + cross-language boundary**를 기준으로 required checks를 합성한다.
+
+```text
+Changed Python only
+→ Python required checks
+
+Changed TS/JS only
+→ ECMAScript required checks
+
+Changed Java only
+→ JVM required checks
+
+Changed Spring API + Next.js client
+→ Java checks ∪ TS checks ∪ API/integration boundary check
+
+Changed unsupported behavior source
+→ required capability NOT_AVAILABLE
+→ overall INCONCLUSIVE
+```
+
+`ProjectCapabilities`는 Repository metadata self-report가 아니라 trusted language registry, baseline inventory, lockfile/toolchain evidence, M06 availability를 조합하여 생성한다.
+
+```python
+@dataclass(frozen=True)
+class ProjectLanguageCapability:
+    language: LanguageId
+    family: LanguageFamily
+    structural_status: LanguageSupportStatus
+    toolchain_status: LanguageSupportStatus
+    effective_status: LanguageSupportStatus
+    capabilities: frozenset[LanguageCapability]
+    structural_adapter_id: str | None
+    structural_adapter_version: str | None
+    toolchain_adapter_id: str | None
+    toolchain_adapter_version: str | None
+    environment_fingerprint_ref: str | None
+```
+
+Patch가 adapter/toolchain config를 새로 추가해 자기 자신의 support status를 `ACTIVE`로 승격시키거나 required check를 `NOT_APPLICABLE`로 면제하지 못한다. baseline inventory 또는 trusted administrative registration으로 교차 확인한다.
+
+언어별 profiling evidence는 공통 `ProfilerResult`로 normalize하되 raw 의미를 잃지 않는다.
+
+```text
+Python       → allocation / process peak / cProfile evidence
+TS/JS        → V8 CPU/heap + process/cgroup evidence
+Java         → JFR/GC/heap + process/cgroup evidence
+```
+
+Heap dump, V8 heap snapshot 등 대형/민감 artifact는 일반 Audit payload에 저장하지 않고 M08 classification을 거친 protected artifact 경로를 사용한다.
+
+---
+
 # 31. Verification Basis
 
 `verification_basis_id`는 단순 임의 UUID가 아니라 아래 authority를 integrity-link 해야 한다.
@@ -4436,6 +4875,8 @@ command policy version
 sandbox profile version
 security exception decision reference
 NOT_APPLICABLE decision reference
+structural language adapter set/version reference
+toolchain adapter/template version set
 toolchain / environment fingerprint
 ```
 
@@ -4688,7 +5129,7 @@ DD-01  M09 DB + Audit/Event transaction
        ↓
 DD-02  M01 Identity / Repository ACL
        ↓
-DD-03  M02 Safe Repository Inspection + Source Snapshot
+DD-03  M02 Safe Repository Inspection + Source Snapshot + StructuralLanguageRegistry/Python adapter
        ↓
 DD-04  M08 Policy Engine
        ↓
@@ -4698,9 +5139,9 @@ DD-06  M03 Planner / Request Intent
        ↓
 DD-07  M04 Impact / Risk
        ↓
-DD-08  M06 Command Policy + Sandbox
+DD-08  M06 Command Policy + Sandbox + language toolchain contract
        ↓
-DD-09  M07 Verification / Profiling / Benchmark
+DD-09  M07 Verification / Profiling / Benchmark (Python first, TS/JS then Java)
        ↓
 DD-10  M05 Patch Lifecycle / Apply / Recovery
        ↓
@@ -4866,6 +5307,8 @@ design/appendices/sequence/*.mmd
 
 ```text
 Agent Core            Python
+Target languages      Python PARTIAL (Structural PARTIAL / Toolchain PARTIAL) / TypeScript·JavaScript PLANNED / Java PLANNED
+Language boundary     StructuralLanguageRegistry/Adapter(M02) + LanguageToolchainRegistry/Adapter(M06/M07)
 CLI                   Typer
 Web                   Next.js + Spring Boot
 AI / RAG              FastAPI + Local LLM
