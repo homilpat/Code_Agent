@@ -1,0 +1,10 @@
+src/kh_agent/security/policy.py
+<<<<<<< SEARCH
+    root = trusted_root.resolve(strict=True)
+    if any(root.is_relative_to(repo.resolve(strict=True)) for repo in repository_roots):
+=======
+    root = trusted_root.resolve(strict=True)
+    # A deleted or moved registration cannot contain the store, so it must not block loading.
+    existing = tuple(repo.resolve() for repo in repository_roots if repo.exists())
+    if any(root.is_relative_to(repo) for repo in existing):
+>>>>>>> REPLACE

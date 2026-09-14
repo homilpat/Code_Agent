@@ -1,0 +1,19 @@
+{
+  "id": "ca-002-policy-deleted-repo",
+  "source": "docs/IMPLEMENTATION_PROGRESS.md 2026-09-14 code review: policy load (high)",
+  "base_commit": "b8060c7896311fdaa5e3f66c53a07ca50dd71d79",
+  "repo_subdir": "code-agent",
+  "issue_file": "issue.md",
+  "context_files": [
+    "src/kh_agent/security/policy.py",
+    "tests/test_policy.py"
+  ],
+  "hidden_tests": {
+    "tests/test_eval_policy_deleted_repo.py": "hidden/test_eval_policy_deleted_repo.py"
+  },
+  "fail_to_pass": [
+    "tests/test_eval_policy_deleted_repo.py::test_deleted_repository_root_is_ignored",
+    "tests/test_eval_policy_deleted_repo.py::test_store_inside_repository_is_denied_after_deleted_root"
+  ],
+  "solution_file": "solution.edits"
+}
