@@ -58,6 +58,20 @@ def test_detached_head_is_not_normal(environment):
     assert result["head_state"] == "DETACHED"
 
 
+def test_safe_git_environment_is_built_from_scratch(monkeypatch):
+    from kh_agent.repository.safe_git import CONFIG_OVERRIDES, git_environment
+
+    for name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_SSH_COMMAND"):
+        monkeypatch.setenv(name, "hostile")
+    env = git_environment("isolated-home")
+    assert not {"GIT_DIR", "GIT_WORK_TREE", "GIT_ALTERNATE_OBJECT_DIRECTORIES"} & env.keys()
+    assert "GIT_SSH_COMMAND" not in env and env["HOME"] == "isolated-home"
+    assert env["GIT_CONFIG_NOSYSTEM"] == "1" and env["GIT_TERMINAL_PROMPT"] == "0"
+    assert env["GIT_NO_REPLACE_OBJECTS"] == "1"
+    for override in ("core.fsmonitor=false", "credential.helper=", "protocol.allow=never"):
+        assert override in CONFIG_OVERRIDES
+
+
 @pytest.mark.req("M02-CTX-004", "M02-CTX-005", "M02-CTX-006")
 @pytest.mark.parametrize(
     "marker, is_directory",
