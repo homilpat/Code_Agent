@@ -5,6 +5,32 @@ from kh_agent.core.canonical import canonical_hash
 from kh_agent.core.errors import DomainError, ErrorCode
 from kh_agent.patch.canonical import target_path
 
+# Mounted read-only at /trusted/pytest.ini. `-c` makes repository ini files irrelevant and
+# --rootdir keeps discovery inside the source view; pythonpath covers flat and src layouts.
+TRUSTED_PYTEST_INI = (
+    "[pytest]\n"
+    "addopts =\n"
+    "pythonpath = /workspace/src /workspace/src/src\n"
+    "cache_dir = /tmp/pytest-cache\n"
+)
+IMAGE_REFERENCE = re.compile(r"(?:[a-z0-9][a-z0-9./:_-]*@)?sha256:[0-9a-f]{64}|[0-9a-f]{64}")
+RUNTIME_SYNTAX = {
+    "docker": {
+        "readonly": "readonly",
+        "no_new_privileges": "no-new-privileges=true",
+        "tmp_inodes": ",nr_inodes=16384",
+        "out_inodes": ",nr_inodes=65536",
+    },
+    # Podman 4.9 rejects nr_inodes on tmpfs; only the byte size is capped there, and the
+    # attested capability descriptor records that no inode limit is enforced.
+    "podman": {
+        "readonly": "ro=true",
+        "no_new_privileges": "no-new-privileges",
+        "tmp_inodes": "",
+        "out_inodes": "",
+    },
+}
+
 
 @dataclass(frozen=True)
 class PytestRequest:
@@ -49,15 +75,21 @@ def compile_pytest(request: PytestRequest) -> CompiledCommand:
             raise DomainError(ErrorCode.INVALID_INPUT, "Unsupported test path")
     return CompiledCommand(
         "python-pytest",
-        "python-pytest-v1",
+        "python-pytest-v2",
         (
             "/usr/local/bin/python",
+            # -I ignores PYTHON* variables, user site and the working directory; -B is explicit
+            # because -I also ignores PYTHONDONTWRITEBYTECODE.
             "-I",
+            "-B",
             "-m",
             "pytest",
             "-q",
+            "-p",
+            "no:cacheprovider",
             "-c",
             "/trusted/pytest.ini",
+            "--rootdir=/workspace/src",
             "--override-ini",
             "addopts=",
             "--",
@@ -97,21 +129,26 @@ class SandboxProfile:
                 raise DomainError(ErrorCode.INVALID_INPUT, "Invalid sandbox resource ceiling")
 
 
-def docker_plan(
+def container_plan(
     command: CompiledCommand,
     *,
+    runtime: str,
     image: str,
     source_view: str,
     trusted_config: str,
     container_name: str,
     profile: SandboxProfile | None = None,
+    apparmor_profile: str | None = None,
 ) -> dict:
     """Produce a reviewable plan only; flags alone do not attest a safe runtime.
 
-    No subprocess exists in this module. Backend must verify rootless/cgroups/LSM,
-    source view classification and hash, image provenance, timeout and cleanup first.
+    `sandbox.container` executes a plan only after attesting rootless isolation, cgroup limits
+    and seccomp. The AppArmor option is added only when the attested runtime supports it.
     """
     profile = profile or SandboxProfile()
+    if runtime not in RUNTIME_SYNTAX:
+        raise DomainError(ErrorCode.INVALID_INPUT, "Unsupported container runtime")
+    syntax = RUNTIME_SYNTAX[runtime]
     try:
         marker = command.argv.index("--")
         registered = compile_pytest(
@@ -123,10 +160,12 @@ def docker_plan(
         raise DomainError(
             ErrorCode.INVALID_INPUT, "Compiled command was modified after policy validation"
         )
-    if not re.fullmatch(r"[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}", image):
+    if not IMAGE_REFERENCE.fullmatch(image):
         raise DomainError(ErrorCode.INVALID_INPUT, "An immutable local image digest is required")
     if not re.fullmatch(r"kh-[a-z0-9-]{1,60}", container_name):
         raise DomainError(ErrorCode.INVALID_INPUT, "Invalid owned container name")
+    if apparmor_profile is not None and not re.fullmatch(r"[a-z0-9-]{1,64}", apparmor_profile):
+        raise DomainError(ErrorCode.INVALID_INPUT, "Invalid AppArmor profile name")
     for path in (source_view, trusted_config):
         if (
             not path.startswith("/")
@@ -140,9 +179,8 @@ def docker_plan(
             ErrorCode.INVALID_INPUT, "Project code cannot use a host execution profile"
         )
     argv = [
-        "docker",
+        runtime,
         "run",
-        "--rm",
         "--pull=never",
         "--name",
         container_name,
@@ -151,8 +189,11 @@ def docker_plan(
         "--network=none",
         "--read-only",
         "--cap-drop=ALL",
-        "--security-opt=no-new-privileges=true",
-        "--security-opt=apparmor=knowledge-hub-verification-v1",
+        f"--security-opt={syntax['no_new_privileges']}",
+    ]
+    if apparmor_profile is not None:
+        argv.append(f"--security-opt=apparmor={apparmor_profile}")
+    argv += [
         "--user=65532:65532",
         f"--pids-limit={profile.pids}",
         f"--memory={profile.memory_mib}m",
@@ -162,13 +203,13 @@ def docker_plan(
         "--workdir=/workspace/src",
         "--tmpfs",
         # Container-private tmpfs mount, not a host temporary path.
-        f"/tmp:rw,noexec,nosuid,nodev,size={profile.tmp_mib}m,nr_inodes=16384",  # noqa: S108
+        f"/tmp:rw,noexec,nosuid,nodev,size={profile.tmp_mib}m{syntax['tmp_inodes']}",  # noqa: S108
         "--tmpfs",
-        f"/workspace/out:rw,nosuid,nodev,size={profile.output_mib}m,nr_inodes=65536",
+        f"/workspace/out:rw,nosuid,nodev,size={profile.output_mib}m{syntax['out_inodes']}",
         "--mount",
-        f"type=bind,src={source_view},dst=/workspace/src,readonly",
+        f"type=bind,src={source_view},dst=/workspace/src,{syntax['readonly']}",
         "--mount",
-        f"type=bind,src={trusted_config},dst=/trusted/pytest.ini,readonly",
+        f"type=bind,src={trusted_config},dst=/trusted/pytest.ini,{syntax['readonly']}",
     ]
     for name, value in command.environment:
         argv.extend(("--env", f"{name}={value}"))
@@ -176,6 +217,8 @@ def docker_plan(
     argv.extend(("--entrypoint", command.argv[0], image, *command.argv[1:]))
     value = {
         "argv": argv,
+        "runtime": runtime,
+        "lsm_profile": apparmor_profile,
         "profile": asdict(profile),
         "command_hash": command.fingerprint,
         "timeout_seconds": command.timeout_seconds,

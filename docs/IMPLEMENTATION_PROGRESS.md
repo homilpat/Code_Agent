@@ -2,6 +2,22 @@
 
 기준일: 2026-09-15 (Asia/Seoul), 마지막 코드 검증: 2026-09-15
 
+## 2026-09-15: rootless 컨테이너 sandbox backend (M06 1차)
+
+- `sandbox/policy.py`:
+  - `container_plan(runtime=docker|podman)`이 `docker_plan`을 대신한다. runtime별 옵션 문법을 분리했고, AppArmor 옵션은 증명된 경우에만 붙인다.
+  - Podman 4.9는 tmpfs `nr_inodes`를 거부하므로 podman 계획은 크기 한도만 둔다.
+  - pytest 템플릿 `python-pytest-v2`: `python -I -B -m pytest -p no:cacheprovider -c /trusted/pytest.ini --rootdir=/workspace/src --override-ini addopts=`. 신뢰 ini는 `/workspace/src`와 `/workspace/src/src`를 `pythonpath`로 준다.
+- `sandbox/container.py`:
+  - `attest()`: `podman info`에서 rootless, cgroup v2, `cpu memory pids` controller, seccomp를 확인한다. 하나라도 없으면 `CAPABILITY_NOT_AVAILABLE`. 아키텍처 28.1 capability descriptor(LSM 종류, `inode_limit`, OOM 보고 방식 포함)와 digest를 만든다.
+  - `RootlessContainerBackend.execute(command, snapshot)`: 스냅샷(민감 파일·Git 메타데이터 제외)을 임시 source view로 쓰고 읽기 전용으로 마운트한다. 네트워크 없음, cap 전부 제거, no-new-privileges, uid 65532, pids·memory·cpu 한도, tmpfs 쓰기만 허용, 호스트 환경변수 전달 없음.
+  - 출력 한도를 넘거나 시간이 초과되면 컨테이너를 kill하고 INCONCLUSIVE로 둔다. 컨테이너는 항상 삭제한다. `sweep_orphans()`는 남은 관리 컨테이너를 지운다.
+  - rootless Podman은 `OOMKilled`를 보고하지 않는다. 백엔드가 kill하지 않았는데 exit 137이면 `MEMORY_LIMIT_SUSPECTED`로 FAIL 처리한다.
+- `config/sandbox/python-pytest.Containerfile`: digest 고정 `python:3.12-slim`, pytest 9.1.1, 비 root 사용자.
+- 테스트: 계획 문법과 runtime 증명 거부(모든 플랫폼), Linux 실측 6개(통과/실패, 격리 확인, src 구조와 적대적 `pytest.ini`, 시간 초과 후 정리, 메모리 한도, 출력 한도).
+- 결과: Linux 196 passed / 1 skipped, Windows 166 passed / 31 skipped, pyright 0 errors, ruff 통과. 설계 테스트 ID 확인 45 / 일부 17 / 없음 49.
+- 설계 차이: AppArmor/SELinux 없음(seccomp + user namespace로 대체), tmpfs inode 한도 없음, 메모리 초과는 exit code로 추정.
+
 ## 2026-09-15: Safe Git 결과를 status와 변경 게이트에 연결
 
 - `require_mutation_target(snapshot)`(`access/gates.py`):
