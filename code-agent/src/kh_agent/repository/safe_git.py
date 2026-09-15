@@ -458,3 +458,9 @@ class SafeGitInspector:
             mutation_ready=mutation_ready,
             evidence=evidence,
         )
+
+
+def inspect_target(
+    identity: RepositoryIdentity, repository_id: str, policy: IngestionPolicy | None = None
+) -> TargetSnapshot:
+    return SafeGitInspector(identity, repository_id, policy).snapshot()
