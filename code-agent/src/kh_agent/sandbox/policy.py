@@ -107,6 +107,51 @@ def compile_pytest(request: PytestRequest) -> CompiledCommand:
 
 
 @dataclass(frozen=True)
+class LanguageServerRequest:
+    session_seconds: int = 900
+
+
+# Templates whose process is a long-lived server talking over stdin/stdout.
+INTERACTIVE_TEMPLATES = frozenset({"python-language-server"})
+
+
+def compile_language_server(request: LanguageServerRequest) -> CompiledCommand:
+    """Pyright over stdio. The source view carries no repository configuration files."""
+    if type(request.session_seconds) is not int or not 1 <= request.session_seconds <= 3600:
+        raise DomainError(ErrorCode.INVALID_INPUT, "Invalid language server session bounds")
+    return CompiledCommand(
+        "python-language-server",
+        "python-pyright-lsp-v1",
+        (
+            "/usr/local/bin/node",
+            "/usr/local/lib/node_modules/pyright/langserver.index.js",
+            "--stdio",
+        ),
+        (
+            ("PATH", "/usr/local/bin:/usr/bin:/bin"),
+            ("HOME", "/tmp/home"),  # noqa: S108 - path inside the sandbox container
+            ("TMPDIR", "/tmp"),  # noqa: S108 - path inside the sandbox container
+        ),
+        request.session_seconds,
+    )
+
+
+def registered_command(command: CompiledCommand) -> CompiledCommand:
+    """Recompile a command from its template so a modified command never reaches a runtime."""
+    try:
+        if command.template_id == "python-pytest":
+            marker = command.argv.index("--")
+            return compile_pytest(
+                PytestRequest(command.argv[marker + 1 :], command.timeout_seconds)
+            )
+        if command.template_id == "python-language-server":
+            return compile_language_server(LanguageServerRequest(command.timeout_seconds))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise DomainError(ErrorCode.INVALID_INPUT, "Command is not a registered template") from exc
+    raise DomainError(ErrorCode.INVALID_INPUT, "Command is not a registered template")
+
+
+@dataclass(frozen=True)
 class SandboxProfile:
     version: str = "verification-default-v1"
     memory_mib: int = 2048
@@ -149,14 +194,7 @@ def container_plan(
     if runtime not in RUNTIME_SYNTAX:
         raise DomainError(ErrorCode.INVALID_INPUT, "Unsupported container runtime")
     syntax = RUNTIME_SYNTAX[runtime]
-    try:
-        marker = command.argv.index("--")
-        registered = compile_pytest(
-            PytestRequest(command.argv[marker + 1 :], command.timeout_seconds)
-        )
-    except (ValueError, AttributeError, TypeError) as exc:
-        raise DomainError(ErrorCode.INVALID_INPUT, "Command is not a registered template") from exc
-    if command != registered:
+    if command != registered_command(command):
         raise DomainError(
             ErrorCode.INVALID_INPUT, "Compiled command was modified after policy validation"
         )
@@ -178,10 +216,11 @@ def container_plan(
         raise DomainError(
             ErrorCode.INVALID_INPUT, "Project code cannot use a host execution profile"
         )
-    argv = [
-        runtime,
-        "run",
-        "--pull=never",
+    interactive = command.template_id in INTERACTIVE_TEMPLATES
+    argv = [runtime, "run", "--pull=never"]
+    if interactive:
+        argv.append("--interactive")
+    argv += [
         "--name",
         container_name,
         "--label",
@@ -218,6 +257,7 @@ def container_plan(
     value = {
         "argv": argv,
         "runtime": runtime,
+        "interactive": interactive,
         "lsm_profile": apparmor_profile,
         "profile": asdict(profile),
         "command_hash": command.fingerprint,

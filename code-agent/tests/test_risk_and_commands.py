@@ -4,7 +4,13 @@ import pytest
 
 from kh_agent.analysis.risk import FactorEvidence, FactorRule, RiskPolicy, score_risk
 from kh_agent.core.errors import DomainError
-from kh_agent.sandbox.policy import PytestRequest, compile_pytest, container_plan
+from kh_agent.sandbox.policy import (
+    LanguageServerRequest,
+    PytestRequest,
+    compile_language_server,
+    compile_pytest,
+    container_plan,
+)
 
 
 def docker_plan(command, **options):
@@ -151,6 +157,33 @@ def test_podman_plan_uses_runtime_syntax_and_adds_apparmor_only_when_attested():
     for runtime, lsm in (("runc", None), ("podman", "Bad Profile")):
         with pytest.raises(DomainError):
             container_plan(command, runtime=runtime, apparmor_profile=lsm, **options)
+
+
+def test_language_server_template_is_interactive_isolated_and_cannot_be_forged():
+    command = compile_language_server(LanguageServerRequest(300))
+    options = dict(
+        image="sha256:" + "b" * 64,
+        source_view="/private/src",
+        trusted_config="/private/pytest.ini",
+        container_name="kh-lsp",
+    )
+    plan = container_plan(command, runtime="podman", **options)
+    assert plan["interactive"] is True and "--interactive" in plan["argv"]
+    assert "--network=none" in plan["argv"] and "--cap-drop=ALL" in plan["argv"]
+    pytest_plan = container_plan(
+        compile_pytest(PytestRequest(("tests",))), runtime="podman", **options
+    )
+    assert pytest_plan["interactive"] is False and "--interactive" not in pytest_plan["argv"]
+    for forged in (
+        replace(command, argv=("/usr/local/bin/node", "-e", "require('child_process')")),
+        replace(command, timeout_seconds=99_999),
+        replace(command, template_id="shell"),
+        replace(command, environment=(("NODE_OPTIONS", "--require=/workspace/src/x.js"),)),
+    ):
+        with pytest.raises(DomainError):
+            container_plan(forged, runtime="podman", **options)
+    with pytest.raises(DomainError):
+        compile_language_server(LanguageServerRequest(0))
 
 
 def attested_info():
