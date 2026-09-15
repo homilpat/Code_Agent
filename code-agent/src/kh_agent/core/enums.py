@@ -26,7 +26,7 @@ class PatchState(StrEnum):
 
 
 class CheckStatus(StrEnum):
-    PASS = "PASS"
+    PASS = "PASS"  # noqa: S105 - verification status, not a credential
     FAIL = "FAIL"
     INCONCLUSIVE = "INCONCLUSIVE"
     NOT_AVAILABLE = "NOT_AVAILABLE"

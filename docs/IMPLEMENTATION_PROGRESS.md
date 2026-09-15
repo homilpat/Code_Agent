@@ -2,6 +2,41 @@
 
 기준일: 2026-09-15 (Asia/Seoul), 마지막 코드 검증: 2026-09-15
 
+## 2026-09-15: 설계 테스트 ID ↔ 테스트 매핑
+
+- `tests/conftest.py`에 다음을 추가했다.
+  - `@pytest.mark.req("M01-UT-002", partial=False)` marker
+  - `docs/ARCHITECTURE_DETAILED_DESIGN_v1.10.md`에서 테스트 ID를 읽어 marker를 검증한다. 모르는 ID, 빈 marker, 오타 옵션은 수집 단계에서 실패한다.
+  - `pytest --req-report`로 확인·일부·없음 개수와 목록을 출력한다.
+  - 검증 로직 자체의 테스트: `tests/test_requirement_ids.py`
+- 설계서에 정의된 테스트 ID는 M01·M02의 111개뿐이다. M01-FR 같은 요구사항 참조는 테스트 ID가 아니며, M03 이후 모듈은 설계서에 테스트 ID가 없다.
+- 매핑 원칙: 설명된 동작을 실제로 단언하는 테스트만 확인으로 표시한다. 명령을 거치지 않고 게이트 함수만 보는 테스트, 설계보다 엄격하게 다르게 구현된 경우는 `partial`이다.
+- 구현됐는데 테스트가 없던 12개에 테스트를 추가했다:
+  - 세션 인증 성공
+  - 선택자 생략 + 리비전 1개
+  - symlink 별칭·linked worktree·다른 clone의 저장소 identity
+  - merge·rebase·cherry-pick·revert·sequencer 진행 중 상태
+  - 저장소 안 symlink와 민감 파일 symlink 미추적
+  - `.git` 파일 경계
+  - 빌드 산출물 제외
+  - 새 결함은 발견되지 않았다.
+- 결과: **확인 30 / 일부 19 / 없음 62**. 남은 미커버는 미구현 기능(승인·적용, Git index·객체, freshness, TS/Java, Potpie), 알려진 결함(unborn HEAD), 권한 없이 만들기 어려운 경계(bind mount, Windows reparse)다.
+- 테스트: Linux 165 passed / 1 skipped, Windows 157 passed / 9 skipped(Linux 전용과 symlink 권한), pyright 0 errors, ruff check/format 통과.
+
+## 2026-09-15: Linux 첫 실행 검증과 정적 게이트(ruff S, pyright) 도입
+
+- WSL2 Ubuntu 24.04(Python 3.12.3) ext4 작업 사본에서 전체 테스트 **146 passed / 1 skipped**(Windows 전용 1개). Windows에서 skip되던 openat2 스캐너·artifact 테스트 5개가 처음 실행돼 통과했다.
+- Linux 저장소로 CLI를 처음 실사용했다: `doctor → init → repo register → status → explain → impact → history`는 모두 exit 0, 예약 명령 `modify`는 `CAPABILITY_NOT_AVAILABLE`(exit 2). 저장소 권한 700/600, audit 해시 체인 10건 검증 통과.
+- 실사용에서 확인한 것:
+  - `impact`가 `from pkg import util`로 대상을 쓰는 파일을 후보로 찾지 못한다(리뷰 결함 재현).
+  - `explain`·`impact`는 `ACL_CHECKED`를 2회 기록한다. 소스 수집 뒤 재확인하는 의도된 동작이지만 두 기록을 구분하는 필드가 없다.
+- ruff `S` 규칙을 추가했다(tests의 S101 제외). 지적 5건은 모두 오탐이라 사유를 적은 noqa로 처리했다: 검증 상태 문자열 `"PASS"`, sandbox 컨테이너 내부 `/tmp` 경로 3건, SafeLoader 하위 로더.
+- pyright standard를 도입했다(`[tool.pyright]`, dev 의존성). 기존 오류 4건 수정:
+  - `ChangeEntry`의 content·mode `None`을 명시적으로 거부(`patch/canonical.py` 2곳)
+  - AST 순회 stack 타입 명시
+  - 결과: basic·standard 모두 0 errors.
+- 결과: Windows 142 passed / 5 skipped, Linux 146 passed / 1 skipped, ruff check/format 통과.
+
 ## 2026-09-15: 아키텍처 규약(22~32절) 차이 중 작은 3건 반영
 
 - 검증 판정(`core/lifecycle.py`):

@@ -88,6 +88,8 @@ class ChangeEntry:
         if self.operation == "modify" and self.mode_before != self.mode_after:
             raise DomainError(ErrorCode.INVALID_INPUT, "Mode changes are not supported yet")
         if has_after:
+            if self.content_after_base64 is None:
+                raise DomainError(ErrorCode.INVALID_INPUT, "Invalid encoded patch content")
             try:
                 content = base64.b64decode(self.content_after_base64, validate=True)
             except (ValueError, TypeError) as exc:
@@ -264,6 +266,8 @@ def simulate(
             raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED, "TARGET_PREIMAGE_MISMATCH")
         if entry.operation == "delete":
             del result[path]
+        elif entry.content_after_base64 is None or entry.mode_after is None:
+            raise DomainError(ErrorCode.INVALID_INPUT, "Incomplete file binding")
         else:
             content = base64.b64decode(entry.content_after_base64, validate=True)
             if hashlib.sha256(content).hexdigest() != entry.hash_after:
