@@ -41,6 +41,7 @@ def test_ambiguous_serialization_rejected(value):
         canonical_bytes(value, "v1")
 
 
+@pytest.mark.req("M02-PRS-005", partial=True)
 def test_filesystem_path_bytes_are_reversible():
     raw = b"src/\xff\xfe\n.py"
     assert decode_path(encode_path(raw)) == raw
@@ -52,6 +53,8 @@ def test_filesystem_path_bytes_are_reversible():
         decode_path("$$invalid")
 
 
+@pytest.mark.req("M01-SEC-001", "M01-SEC-002", "M01-SEC-004")
+@pytest.mark.req("M01-SEC-003", partial=True)
 def test_terminal_controls_never_reach_display():
     value = render({"path": "x\x1b]52;c;evil\x07\u202e\u009b\n[bold]"})
     assert "\x1b" not in value and "\x07" not in value and "\u202e" not in value
@@ -67,6 +70,7 @@ def test_terminal_controls_never_reach_display():
         PatchState.INCONCLUSIVE,
     ],
 )
+@pytest.mark.req("M01-IT-015", partial=True)
 def test_cannot_skip_verification_to_approval(state):
     with pytest.raises(DomainError):
         require_transition(state, PatchState.APPROVED)
@@ -111,6 +115,7 @@ def test_required_check_cannot_exempt_itself_as_not_applicable():
     assert verification_outcome(checks) == PatchState.INCONCLUSIVE
 
 
+@pytest.mark.req("M01-UT-006")
 def test_ambiguous_selector_never_selects_latest():
     with pytest.raises(DomainError) as error:
         select_revision([("p", 1), ("p", 2)])
@@ -118,6 +123,12 @@ def test_ambiguous_selector_never_selects_latest():
     assert select_revision([("p", 1), ("p", 2)], "p", 1) == ("p", 1)
     with pytest.raises(DomainError):
         select_revision([("p", 1)], revision=1)
+
+
+@pytest.mark.req("M01-UT-005")
+def test_omitted_selector_picks_the_only_eligible_revision():
+    assert select_revision([("p", 1)]) == ("p", 1)
+    assert select_revision([("p", 1), ("q", 2)], "q") == ("q", 2)
 
 
 @pytest.mark.parametrize(
@@ -130,11 +141,13 @@ def test_ambiguous_selector_never_selects_latest():
         MutationContext("NORMAL", "main", "a", "NORMAL", True),
     ],
 )
+@pytest.mark.req("M01-IT-007", "M01-IT-008", "M01-IT-009", partial=True)
 def test_mutation_gate_unknown_and_dirty_blocked(context):
     with pytest.raises(DomainError):
         require_normal_mutation(context)
 
 
+@pytest.mark.req("M01-IT-012", "M01-IT-013", "M01-IT-014", partial=True)
 def test_verification_gate_requires_all_prerequisites():
     good = dict(
         state=PatchState.APPLIED_TO_WORKTREE,

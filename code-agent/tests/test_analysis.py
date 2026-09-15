@@ -24,6 +24,7 @@ def snapshot_of(mapping):
     )
 
 
+@pytest.mark.req("M02-LNG-001", partial=True)
 def test_ast_extracts_definitions_and_never_executes(tmp_path):
     marker = tmp_path / "must-not-exist"
     data = (
@@ -44,17 +45,20 @@ def test_decorator_call_belongs_to_surrounding_scope():
     assert by_name == {"decorate": "<module>", "work": "run"}
 
 
+@pytest.mark.req("M02-PRS-001")
 def test_parse_failure_is_unavailable_without_raw_error_source():
     result = inspect_python(b"def invalid(secret password here")
     assert result["coverage"] == "UNAVAILABLE"
     assert "password" not in str(result)
 
 
+@pytest.mark.req("M02-PRS-002")
 def test_static_parser_bounds_input_before_building_ast():
     assert inspect_python(b"a" * 262145)["reason"] == "PYTHON_INPUT_LIMIT"
     assert inspect_python(b"a=1\n" * 5000)["reason"] == "PYTHON_TOKEN_LIMIT"
 
 
+@pytest.mark.req("M02-GRF-004", partial=True)
 def test_graph_hash_changes_with_source_and_policy():
     graph = build_graph(snapshot_of({"main.py": b"def first(): pass"}))
     other = build_graph(snapshot_of({"main.py": b"def second(): pass"}))
@@ -84,6 +88,7 @@ def test_sensitive_path_and_content_classification():
     assert not sensitive_content(b"def add(a, b): return a + b")
 
 
+@pytest.mark.req("M01-IT-005")
 def test_explain_is_authorized_before_scan_and_after_scan(environment):
     env = environment
 
@@ -110,6 +115,7 @@ def test_explain_is_authorized_before_scan_and_after_scan(environment):
         Application(env.db, scanner=ForbiddenScanner()).execute("explain", env.repo, "lib.py")
 
 
+@pytest.mark.req("M02-SNP-010", partial=True)
 def test_graph_persistence_and_audit_are_atomic(environment):
     env = environment
 

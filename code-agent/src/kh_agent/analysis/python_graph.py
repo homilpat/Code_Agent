@@ -49,7 +49,7 @@ def inspect_python(data: bytes) -> dict:
             "calls": [],
         }
     definitions, imports, calls = [], [], []
-    stack = [(tree, "")]
+    stack: list[tuple[ast.AST, str]] = [(tree, "")]
     count = 0
     while stack:
         node, scope = stack.pop()

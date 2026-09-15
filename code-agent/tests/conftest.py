@@ -1,4 +1,5 @@
 import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +14,78 @@ from kh_agent.store.artifacts import Artifact
 from kh_agent.store.database import Database
 from kh_agent.store.patches import PatchStore
 from kh_agent.store.registry import Registry
+
+DESIGN = Path(__file__).resolve().parents[2] / "docs" / "ARCHITECTURE_DETAILED_DESIGN_v1.10.md"
+DESIGN_TEST_ID = re.compile(
+    r"^(M\d\d-(?:UT|IT|SEC|CTX|SNP|BND|GIT|GRF|POT|LNG|PRS)-\d{3}) ", re.MULTILINE
+)
+REQUIREMENTS = pytest.StashKey[tuple[set[str], dict[str, set[str]], dict[str, set[str]]]]()
+
+
+def design_test_ids(text: str) -> set[str]:
+    return set(DESIGN_TEST_ID.findall(text))
+
+
+def requirement_coverage(
+    marks: list[tuple[str, tuple, dict]], defined: set[str]
+) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+    """Map design test IDs to tests; an unknown or empty marker is a usage error."""
+    covered: dict[str, set[str]] = {}
+    partial: dict[str, set[str]] = {}
+    for test, ids, options in marks:
+        unknown = set(ids) - defined
+        if not ids or unknown or set(options) - {"partial"}:
+            raise ValueError(f"{test}: invalid req marker {sorted(unknown) or ids or options}")
+        target = partial if options.get("partial") else covered
+        for test_id in ids:
+            target.setdefault(test_id, set()).add(test)
+    return covered, partial
+
+
+def pytest_addoption(parser):
+    parser.addoption("--req-report", action="store_true", help="Summarize design test ID coverage.")
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "req(*ids, partial=False): design test IDs this test verifies"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    defined = design_test_ids(DESIGN.read_text(encoding="utf-8"))
+    marks = [
+        (item.nodeid.split("[")[0], mark.args, mark.kwargs)
+        for item in items
+        for mark in item.iter_markers("req")
+    ]
+    try:
+        covered, partial = requirement_coverage(marks, defined)
+    except ValueError as exc:
+        raise pytest.UsageError(str(exc)) from None
+    config.stash[REQUIREMENTS] = (defined, covered, partial)
+
+
+def pytest_terminal_summary(terminalreporter, config):
+    if not config.getoption("--req-report") or REQUIREMENTS not in config.stash:
+        return
+    defined, covered, partial = config.stash[REQUIREMENTS]
+    only_partial = set(partial) - set(covered)
+    missing = defined - set(covered) - set(partial)
+    write = terminalreporter.write_line
+    terminalreporter.write_sep("-", "design test ID coverage")
+    write(
+        f"defined {len(defined)} | covered {len(covered)} | partial only {len(only_partial)}"
+        f" | uncovered {len(missing)}"
+    )
+    for group in sorted({test_id.rsplit("-", 1)[0] for test_id in defined}):
+        ids = {test_id for test_id in defined if test_id.startswith(group + "-")}
+        write(
+            f"  {group}: {len(ids & set(covered))} covered, "
+            f"{len(ids & only_partial)} partial, {len(ids & missing)} uncovered of {len(ids)}"
+        )
+    write("partial only: " + ", ".join(sorted(only_partial)))
+    write("uncovered: " + ", ".join(sorted(missing)))
 
 
 class MemoryArtifacts:

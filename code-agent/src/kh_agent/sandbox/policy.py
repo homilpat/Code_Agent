@@ -65,10 +65,10 @@ def compile_pytest(request: PytestRequest) -> CompiledCommand:
         ),
         (
             ("PATH", "/usr/local/bin:/usr/bin:/bin"),
-            ("HOME", "/tmp/home"),
+            ("HOME", "/tmp/home"),  # noqa: S108 - path inside the sandbox container
             ("PYTEST_DISABLE_PLUGIN_AUTOLOAD", "1"),
             ("PYTHONDONTWRITEBYTECODE", "1"),
-            ("TMPDIR", "/tmp"),
+            ("TMPDIR", "/tmp"),  # noqa: S108 - path inside the sandbox container
         ),
         request.timeout_seconds,
     )
@@ -161,7 +161,8 @@ def docker_plan(
         "--ipc=private",
         "--workdir=/workspace/src",
         "--tmpfs",
-        f"/tmp:rw,noexec,nosuid,nodev,size={profile.tmp_mib}m,nr_inodes=16384",
+        # Container-private tmpfs mount, not a host temporary path.
+        f"/tmp:rw,noexec,nosuid,nodev,size={profile.tmp_mib}m,nr_inodes=16384",  # noqa: S108
         "--tmpfs",
         f"/workspace/out:rw,nosuid,nodev,size={profile.output_mib}m,nr_inodes=65536",
         "--mount",

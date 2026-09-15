@@ -70,7 +70,7 @@ def parse_policy(data: bytes) -> TrustedPolicy:
                 depth -= 1
             if depth > 20:
                 raise ValueError("Policy depth limit")
-        value = yaml.load(data, Loader=_StrictLoader)
+        value = yaml.load(data, Loader=_StrictLoader)  # noqa: S506 - SafeLoader subclass
         _keys(value, {"schema_version", "version", "ingestion", "risk"})
         if (
             value["schema_version"] != "security-policy-v1"

@@ -14,6 +14,7 @@ from kh_agent.repository.refs import PACKED_REFS_LIMIT, packed_ref
 
 
 @pytest.mark.parametrize("width", [40, 64])
+@pytest.mark.req("M02-CTX-001", partial=True)
 def test_packed_branch_is_declared_only(environment, width):
     git = environment.repo / ".git"
     (git / "refs/heads/main").unlink()
@@ -49,11 +50,38 @@ def test_missing_branch_remains_unresolved(environment):
     assert result["head_state"] == "UNRESOLVED"
 
 
+@pytest.mark.req("M02-CTX-002", "M01-IT-006")
 def test_detached_head_is_not_normal(environment):
     (environment.repo / ".git/HEAD").write_bytes(b"c" * 40 + b"\n")
     result = Application(environment.db).execute("status", environment.repo)
     assert result["branch"] is None
     assert result["head_state"] == "DETACHED"
+
+
+@pytest.mark.req("M02-CTX-004", "M02-CTX-005", "M02-CTX-006")
+@pytest.mark.parametrize(
+    "marker, is_directory",
+    [
+        ("MERGE_HEAD", False),
+        ("rebase-merge", True),
+        ("rebase-apply", True),
+        ("CHERRY_PICK_HEAD", False),
+        ("REVERT_HEAD", False),
+        ("sequencer", True),
+    ],
+)
+def test_in_progress_git_operation_is_reported_and_not_mutation_ready(
+    environment, marker, is_directory
+):
+    path = environment.repo / ".git" / marker
+    if is_directory:
+        path.mkdir()
+    else:
+        path.write_bytes(b"a" * 40 + b"\n")
+    result = Application(environment.db).execute("status", environment.repo)
+    assert result["git_operation_state"] == "IN_PROGRESS"
+    assert result["git_operations"] == [marker]
+    assert result["mutation_ready"] is False
 
 
 @pytest.mark.parametrize(
@@ -70,6 +98,7 @@ def test_detached_head_is_not_normal(environment):
         b"refs/heads/a\x00b",
     ],
 )
+@pytest.mark.req("M02-CTX-007")
 def test_invalid_ref_blocked_before_path_lookup(environment, ref):
     (environment.repo / ".git/HEAD").write_bytes(b"ref: " + ref + b"\n")
     with pytest.raises(DomainError) as error:
@@ -90,11 +119,13 @@ def test_invalid_ref_blocked_before_path_lookup(environment, ref):
     ],
     ids=["oid", "duplicate", "orphan-peel", "peel-width", "mixed-width", "path", "quota"],
 )
+@pytest.mark.req("M02-CTX-007")
 def test_malformed_packed_refs_rejected(data):
     with pytest.raises(DomainError):
         packed_ref(data, b"refs/heads/main")
 
 
+@pytest.mark.req("M02-CTX-007")
 def test_ref_created_during_packed_lookup_is_blocked(environment, monkeypatch):
     git = environment.repo / ".git"
     loose = git / "refs/heads/main"
@@ -113,6 +144,7 @@ def test_ref_created_during_packed_lookup_is_blocked(environment, monkeypatch):
         Application(environment.db).execute("status", environment.repo)
 
 
+@pytest.mark.req("M02-CTX-007")
 def test_metadata_change_during_read_is_blocked(tmp_path, monkeypatch):
     path = tmp_path / "HEAD"
     path.write_bytes(b"a" * 40)
@@ -153,6 +185,7 @@ def test_path_stat_ctime_lag_tolerated_only_off_linux(tmp_path, monkeypatch, fie
             read_metadata(path)
 
 
+@pytest.mark.req("M02-CTX-007")
 def test_hardlinked_metadata_blocked(tmp_path):
     path = tmp_path / "HEAD"
     path.write_bytes(b"a" * 40)
