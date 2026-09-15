@@ -18,7 +18,9 @@ from kh_agent.core.ids import AuditEventId
 class Database:
     """All writers serialize here; mandatory event and state writes share a transaction."""
 
-    SCHEMA_VERSION = 1
+    # v2 adds the audit hash chain. v1 stores are refused rather than upgraded: back-filling
+    # digests would certify history that was never protected.
+    SCHEMA_VERSION = 2
 
     def __init__(self, path: Path, *, timeout: float = 2.0) -> None:
         if not 0 < timeout <= 30:
@@ -154,19 +156,66 @@ def append_event(
         raise DomainError(ErrorCode.INVALID_INPUT, "Audit metadata must be scalar")
     if any(isinstance(value, str) and len(value) > 256 for value in payload.values()):
         raise DomainError(ErrorCode.INVALID_INPUT, "Audit metadata exceeds field limit")
-    event_id = str(AuditEventId.new())
+    # Callers hold the store's BEGIN IMMEDIATE transaction, so reading the tail is serialized.
+    last = conn.execute(
+        "SELECT sequence,event_digest FROM audit_events ORDER BY sequence DESC LIMIT 1"
+    ).fetchone()
+    event = {
+        "sequence": last["sequence"] + 1 if last else 1,
+        "event_id": str(AuditEventId.new()),
+        "aggregate_type": aggregate_type,
+        "aggregate_id": aggregate_id,
+        "event_type": event_type,
+        "event_version": 1,
+        "repository_id": repository_id,
+        "user_id": user_id,
+        "payload_json": json.dumps(payload, sort_keys=True, ensure_ascii=True),
+        "created_at": utc_now(),
+        "previous_event_digest": last["event_digest"] if last else None,
+    }
     conn.execute(
-        "INSERT INTO audit_events(event_id,aggregate_type,aggregate_id,event_type,"
-        "repository_id,user_id,payload_json,created_at) VALUES (?,?,?,?,?,?,?,?)",
-        (
-            event_id,
-            aggregate_type,
-            aggregate_id,
-            event_type,
-            repository_id,
-            user_id,
-            json.dumps(payload, sort_keys=True, ensure_ascii=True),
-            utc_now(),
-        ),
+        f"INSERT INTO audit_events({','.join(AUDIT_COLUMNS)},event_digest) "  # noqa: S608
+        f"VALUES ({','.join('?' * (len(AUDIT_COLUMNS) + 1))})",
+        (*(event[column] for column in AUDIT_COLUMNS), _event_digest(event)),
     )
-    return event_id
+    return event["event_id"]
+
+
+AUDIT_COLUMNS = (
+    "sequence",
+    "event_id",
+    "aggregate_type",
+    "aggregate_id",
+    "event_type",
+    "event_version",
+    "repository_id",
+    "user_id",
+    "payload_json",
+    "created_at",
+    "previous_event_digest",
+)
+
+
+def _event_digest(event: dict[str, Any]) -> str:
+    return canonical_hash(event, "audit-event-v1").digest
+
+
+def verify_audit_chain(conn: sqlite3.Connection) -> int:
+    """Detect edited, reordered or removed events and return how many were checked.
+
+    Removing only the newest events keeps a valid chain; detecting that needs the last
+    digest checkpointed outside this database.
+    """
+    previous = None
+    count = 0
+    for row in conn.execute("SELECT * FROM audit_events ORDER BY sequence"):
+        count += 1
+        event = {column: row[column] for column in AUDIT_COLUMNS}
+        if (
+            row["sequence"] != count
+            or row["previous_event_digest"] != previous
+            or _event_digest(event) != row["event_digest"]
+        ):
+            raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED, "Audit chain is broken")
+        previous = row["event_digest"]
+    return count

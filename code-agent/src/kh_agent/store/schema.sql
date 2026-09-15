@@ -84,7 +84,10 @@ CREATE TABLE audit_events (
     repository_id TEXT REFERENCES repositories(repository_id),
     user_id TEXT REFERENCES users(user_id),
     payload_json TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    previous_event_digest TEXT,
+    event_digest TEXT UNIQUE NOT NULL,
+    CHECK((sequence = 1) = (previous_event_digest IS NULL))
 );
 CREATE TABLE operations (
     idempotency_key TEXT PRIMARY KEY,
@@ -109,4 +112,4 @@ CREATE TRIGGER result_no_update BEFORE UPDATE ON verification_results
 BEGIN SELECT RAISE(ABORT, 'Verification results are immutable'); END;
 CREATE TRIGGER result_no_delete BEFORE DELETE ON verification_results
 BEGIN SELECT RAISE(ABORT, 'Verification results are immutable'); END;
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;

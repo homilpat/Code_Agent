@@ -187,4 +187,4 @@ def test_canonical_proposal_persists_with_trusted_request_binding(environment):
         "SELECT proposal_base_commit,proposal_source_snapshot_hash FROM patch_revisions"
     )[0]
     assert tuple(row) == (base.commit_sha, base.source_snapshot_hash)
-    assert env.patches.check_integrity() == {"revisions_checked": 1}
+    assert env.patches.check_integrity()["revisions_checked"] == 1

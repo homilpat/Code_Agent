@@ -2,6 +2,22 @@
 
 기준일: 2026-09-15 (Asia/Seoul), 마지막 코드 검증: 2026-09-15
 
+## 2026-09-15: 아키텍처 규약(22~32절) 차이 중 작은 3건 반영
+
+- 검증 판정(`core/lifecycle.py`):
+  - 필수 검사는 증거가 있는 `PASS`만 통과한다.
+  - 호출자가 넣는 참조 문자열(`na_decision_reference`)만으로 `NOT_APPLICABLE` 면제가 되던 경로를 없애고, 필드도 삭제했다. 이 경우는 `INCONCLUSIVE`로 판정한다.
+  - 조건부 필수(27.1절 `CONDITIONAL`)와 신뢰할 수 있는 적용성 판정이 생기면 다시 허용한다.
+- 결과값 `ERROR` 추가(`core/enums.py`). 필수 검사가 `ERROR`면 `INCONCLUSIVE`이고, 선택 검사는 판정에 영향이 없다.
+- audit 해시 체인(`store/schema.sql`, `store/database.py`):
+  - 각 이벤트에 `previous_event_digest`와 `event_digest`를 저장한다. `event_digest`는 순번·내용·시각·이전 digest를 묶은 canonical hash다. 순번은 1부터 빈틈 없이 부여한다.
+  - `verify_audit_chain`이 수정·순서 변경·중간 삭제를 탐지하고, `PatchStore.check_integrity`가 이를 호출한다.
+  - 최신 이벤트 뒷부분만 잘라낸 경우는 마지막 digest를 외부에 보관해야 탐지할 수 있다(미구현).
+- 스키마 v2. v1 저장소는 변환하지 않고 `SCHEMA_VERSION_UNSUPPORTED`로 거부한다. 과거 기록에 digest를 새로 붙이면 보호되지 않았던 이력을 인증하게 되기 때문이다.
+- 결과: **142 passed / Linux 전용 5 skipped**, ruff check/format 통과.
+- 수정 전 소스에서 새 테스트가 실패함을 확인했다: `test_domain` 2건 실패, `test_store`는 `verify_audit_chain`이 없어 import 실패.
+- 다음: Safe Git object/index adapter(TargetSnapshot 형태). 상태 전이 재설계(26절)는 승인·적용 단계에서 한다.
+
 ## 2026-09-15: 코드 리뷰 선행 결함 3건 수정
 
 아래 "코드 리뷰 결과" 표의 높음 2건과 `head_state`(중간)를 고쳤다.
