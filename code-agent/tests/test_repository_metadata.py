@@ -29,6 +29,7 @@ def test_packed_branch_is_declared_only(environment, width):
     result = Application(environment.db).execute("status", environment.repo)
     assert result["branch"] == "main"
     assert result["declared_head_oid"] == "b" * width
+    assert result["head_state"] == "NORMAL"
     assert result["commit_sha"] is None
     assert result["working_tree_dirty"] is None
     assert result["mutation_ready"] is False
@@ -38,6 +39,7 @@ def test_loose_ref_overrides_packed(environment):
     (environment.repo / ".git/packed-refs").write_bytes(b"b" * 40 + b" refs/heads/main\n")
     result = Application(environment.db).execute("status", environment.repo)
     assert result["declared_head_oid"] == "a" * 40
+    assert result["head_state"] == "NORMAL"
 
 
 def test_missing_branch_remains_unresolved(environment):
@@ -45,6 +47,13 @@ def test_missing_branch_remains_unresolved(environment):
     result = Application(environment.db).execute("status", environment.repo)
     assert result["declared_head_oid"] is None
     assert result["head_state"] == "UNRESOLVED"
+
+
+def test_detached_head_is_not_normal(environment):
+    (environment.repo / ".git/HEAD").write_bytes(b"c" * 40 + b"\n")
+    result = Application(environment.db).execute("status", environment.repo)
+    assert result["branch"] is None
+    assert result["head_state"] == "DETACHED"
 
 
 @pytest.mark.parametrize(

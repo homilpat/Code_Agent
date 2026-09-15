@@ -7,9 +7,31 @@ import pytest
 from kh_agent.access.gates import VerificationReadiness
 from kh_agent.core.enums import CheckStatus, Classification, PatchState
 from kh_agent.core.errors import DomainError, ErrorCode
+from kh_agent.core.ids import RepositoryId
 from kh_agent.core.lifecycle import CheckResult
+from kh_agent.patch.canonical import ProposalBase, canonicalize_candidate
 from kh_agent.store.database import Database, append_event
 from kh_agent.store.patches import PatchStore
+
+
+def canonical(env, intent, repository_id=None):
+    base = ProposalBase(
+        repository_id or env.repository_id,
+        intent,
+        "main",
+        "a" * 40,
+        "b" * 64,
+        "c" * 64,
+        "COMPLETE",
+        False,
+    )
+    operations = [{"path": "a.py", "operation": "create", "content": "pass"}]
+    return canonicalize_candidate(
+        json.dumps({"operations": operations}).encode(),
+        base,
+        {},
+        generator_provenance="test-generator-v1",
+    )
 
 
 def proposal(env, key="proposal", **kwargs):
@@ -21,11 +43,8 @@ def proposal(env, key="proposal", **kwargs):
         "intent",
     )
     return env.patches.propose(
-        intent_id=intent,
         user_id=env.actor.user_id,
-        base_commit="a" * 40,
-        source_snapshot_hash="b" * 64,
-        proposal={"operations": []},
+        proposal=canonical(env, intent),
         classification=Classification.NORMAL,
         key=key,
         **kwargs,
@@ -128,11 +147,8 @@ def test_proposal_retry_and_intent_binding(environment):
     )
     with pytest.raises(DomainError):
         env.patches.propose(
-            intent_id=other,
             user_id=env.actor.user_id,
-            base_commit="a" * 40,
-            source_snapshot_hash="b" * 64,
-            proposal={},
+            proposal=canonical(env, other),
             key="bad",
             classification=Classification.NORMAL,
             patch_id=first["patch_id"],
@@ -141,6 +157,26 @@ def test_proposal_retry_and_intent_binding(environment):
         [tuple(r) for r in env.db.rows("SELECT * FROM audit_events")]
     )
     assert env.patches.check_integrity()["revisions_checked"] == 2
+
+
+def test_proposal_base_must_be_canonical_and_match_intent_repository(environment):
+    env = environment
+    intent = env.patches.create_intent(
+        env.repository_id, env.actor.user_id, "change", "modify", "intent"
+    )
+    for key, candidate in (
+        ("other-repository", canonical(env, intent, str(RepositoryId.new()))),
+        ("raw-payload", canonical(env, intent).payload()),
+    ):
+        with pytest.raises(DomainError) as error:
+            env.patches.propose(
+                user_id=env.actor.user_id,
+                proposal=candidate,
+                key=key,
+                classification=Classification.NORMAL,
+            )
+        assert error.value.code == ErrorCode.INVALID_INPUT
+    assert env.db.rows("SELECT * FROM patches") == []
 
 
 def test_idempotency_conflict_is_not_silent(environment):

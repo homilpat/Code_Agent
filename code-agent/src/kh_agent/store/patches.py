@@ -1,7 +1,6 @@
 import hashlib
 import json
 from dataclasses import asdict
-from typing import Any
 
 from kh_agent.access.gates import VerificationReadiness
 from kh_agent.core.canonical import ContentHash, canonical_bytes, canonical_hash
@@ -16,6 +15,7 @@ from kh_agent.core.ids import (
     VerificationResultId,
 )
 from kh_agent.core.lifecycle import CheckResult, require_transition, verification_outcome
+from kh_agent.patch.canonical import CanonicalProposal
 from kh_agent.store.artifacts import Artifact, ArtifactBackend
 from kh_agent.store.database import Database, append_event
 
@@ -74,33 +74,32 @@ class PatchStore:
     def propose(
         self,
         *,
-        intent_id: str,
         user_id: str,
-        base_commit: str,
-        source_snapshot_hash: str,
-        proposal: dict[str, Any],
+        proposal: CanonicalProposal,
         key: str,
         classification: Classification,
         patch_id: str | None = None,
     ) -> dict:
         if not isinstance(classification, Classification):
             raise DomainError(ErrorCode.INVALID_INPUT, "Trusted classification is required")
-        ContentHash(source_snapshot_hash, "source-snapshot-v1")
-        if len(base_commit) not in (40, 64) or any(
-            c not in "0123456789abcdef" for c in base_commit
-        ):
-            raise DomainError(ErrorCode.INVALID_INPUT, "Resolvable base commit required")
+        if not isinstance(proposal, CanonicalProposal):
+            raise DomainError(ErrorCode.INVALID_INPUT, "A canonical proposal is required")
         if patch_id is not None:
             PatchId(patch_id)
-        # Caller supplies a canonical proposal from the trusted M05 adapter.
-        # Candidate data is nested and cannot overwrite trusted request/base binding.
+        # Intent, repository and base come only from the validated canonical proposal,
+        # so a caller cannot store a proposal under a base it was not generated from.
+        base = proposal.base
+        intent_id = base.request_intent_id
+        base_commit = base.commit_sha
+        source_snapshot_hash = base.source_snapshot_hash
+        payload = proposal.payload()
         request = {
             "action": "propose",
             "intent_id": intent_id,
             "user_id": user_id,
             "base_commit": base_commit,
             "source_snapshot_hash": source_snapshot_hash,
-            "proposal": proposal,
+            "proposal": payload,
             "patch_id": patch_id,
             "classification": classification.value,
         }
@@ -111,6 +110,10 @@ class PatchStore:
             ).fetchone()
             if not intent or intent["user_id"] != user_id:
                 raise DomainError(ErrorCode.ACCESS_DENIED)
+            if intent["repository_id"] != base.repository_id:
+                raise DomainError(
+                    ErrorCode.INVALID_INPUT, "Proposal base belongs to another repository"
+                )
             current_patch_id = patch_id or str(PatchId.new())
             revision = 1
             if patch_id:
@@ -132,7 +135,7 @@ class PatchStore:
                 "repository_id": intent["repository_id"],
                 "base_commit": base_commit,
                 "source_snapshot_hash": source_snapshot_hash,
-                "proposal": proposal,
+                "proposal": payload,
             }
             data = canonical_bytes(canonical, "patch-proposal-v1")
             artifact = self.artifacts.write(data, "patch-proposal-v1", classification)
