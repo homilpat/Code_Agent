@@ -147,6 +147,31 @@ def test_mutation_gate_unknown_and_dirty_blocked(context):
         require_normal_mutation(context)
 
 
+def test_mutation_target_requires_a_ready_safe_git_snapshot():
+    from dataclasses import replace
+
+    from kh_agent.access.gates import require_mutation_target
+    from kh_agent.repository.safe_git import TargetSnapshot
+
+    evidence = {
+        "head": {"head_state": "NORMAL", "branch": "main", "commit_sha": "a" * 40},
+        "git_operations": [],
+        "worktree": {"dirty": False},
+    }
+    ready = TargetSnapshot(
+        "repo", "GIT_WORKTREE", "a" * 40, "d" * 64, "WORKTREE", "t", "m", "COMPLETE", True, evidence
+    )
+    require_mutation_target(ready)
+    for changed, code in (
+        ({"evidence": {**evidence, "worktree": {"dirty": True}}}, ErrorCode.DIRTY_WORKTREE_BLOCKED),
+        ({"evidence": {**evidence, "git_operations": ["MERGE_HEAD"]}}, None),
+        ({"completeness": "PARTIAL"}, None),
+    ):
+        with pytest.raises(DomainError) as error:
+            require_mutation_target(replace(ready, mutation_ready=False, **changed))
+        assert error.value.code == (code or ErrorCode.REPOSITORY_STATE_BLOCKED)
+
+
 @pytest.mark.req("M01-IT-012", "M01-IT-013", "M01-IT-014", partial=True)
 def test_verification_gate_requires_all_prerequisites():
     good = dict(

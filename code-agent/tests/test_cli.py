@@ -41,9 +41,12 @@ def test_local_cli_registration_status_and_history(environment, monkeypatch, tmp
     result = runner.invoke(app, ["history", "--repo", str(env.repo)])
     assert result.exit_code == 0
     assert json.loads(result.stdout)["events"]
+    # The fixture has refs but no commit objects: on Linux Safe Git resolves HEAD as UNRESOLVED
+    # and blocks; elsewhere inspection is unsupported. Either way mutation fails closed.
     result = runner.invoke(app, ["modify", "change requested", "--repo", str(env.repo)])
     assert result.exit_code == 2
-    assert "CAPABILITY_NOT_AVAILABLE" in result.output
+    expected = "REPOSITORY_STATE_BLOCKED" if sys.platform == "linux" else "UNSUPPORTED_PLATFORM"
+    assert expected in result.output
 
 
 def test_apply_has_no_auto_approve_switch():

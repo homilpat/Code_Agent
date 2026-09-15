@@ -5,9 +5,14 @@ import sys
 
 import pytest
 
+from kh_agent.application import Application
 from kh_agent.core.canonical import encode_path
+from kh_agent.core.errors import DomainError, ErrorCode
+from kh_agent.identity.service import Identity
 from kh_agent.repository.identity import RepositoryIdentityResolver
-from kh_agent.repository.safe_git import CLEAN, SafeGitInspector
+from kh_agent.repository.safe_git import CLEAN, SafeGitInspector, inspect_target
+from kh_agent.store.database import Database
+from kh_agent.store.registry import Registry
 
 GIT = shutil.which("git") or "git"
 pytestmark = pytest.mark.skipif(
@@ -223,3 +228,73 @@ def test_in_progress_operation_blocks_mutation_readiness(repo):
     state = inspect(path)
     assert state.evidence["git_operations"] == ["MERGE_HEAD"]
     assert state.completeness == "COMPLETE" and not state.mutation_ready
+
+
+@pytest.fixture
+def application(tmp_path, monkeypatch):
+    opened = []
+
+    def build(path):
+        db = Database(tmp_path / "store" / f"kh-{len(opened)}.db")
+        opened.append(db)
+        registry = Registry(db)
+        actor = Identity(registry.bootstrap("linux-uid:1000"), "OS_MAPPING")
+        monkeypatch.setattr(
+            "kh_agent.identity.service.current_os_principal", lambda: "linux-uid:1000"
+        )
+        registry.register(actor, RepositoryIdentityResolver().resolve(path), "register")
+        return Application(db, target_inspector=inspect_target)
+
+    yield build
+    for db in opened:
+        db.close()
+
+
+def test_status_reports_the_safe_git_target(repo, application):
+    path, git = repo
+    app = application(path)
+    clean = app.execute("status", path)
+    assert clean["inspection_scope"] == "SAFE_GIT_PLUMBING"
+    assert clean["commit_sha"] == git("rev-parse", "HEAD")
+    assert clean["working_tree_dirty"] is False and clean["mutation_ready"] is True
+    (path / "app.py").write_text("def app():\n    return 5\n")
+    dirty = app.execute("status", path)
+    assert dirty["working_tree_dirty"] is True and dirty["unstaged_changes"] == 1
+    assert dirty["mutation_ready"] is False
+    assert dirty["target_state_digest"] != clean["target_state_digest"]
+
+
+@pytest.mark.req("M01-IT-007")
+@pytest.mark.req("M01-IT-008", "M01-IT-009", partial=True)  # APPLY is not implemented yet
+@pytest.mark.parametrize(
+    "state, code",
+    [
+        ("detached", ErrorCode.REPOSITORY_STATE_BLOCKED),
+        ("merge", ErrorCode.REPOSITORY_STATE_BLOCKED),
+        ("rebase", ErrorCode.REPOSITORY_STATE_BLOCKED),
+        ("dirty", ErrorCode.DIRTY_WORKTREE_BLOCKED),
+        ("filtered", ErrorCode.REPOSITORY_STATE_BLOCKED),
+    ],
+)
+def test_mutation_commands_are_blocked_on_an_unsafe_target(repo, application, state, code):
+    path, git = repo
+    app = application(path)
+    with pytest.raises(DomainError) as ready:
+        app.execute("modify", path)
+    assert ready.value.code == ErrorCode.CAPABILITY_NOT_AVAILABLE
+    if state == "detached":
+        git("checkout", "-q", "--detach")
+    elif state == "merge":
+        (path / ".git" / "MERGE_HEAD").write_text(git("rev-parse", "HEAD") + "\n")
+    elif state == "rebase":
+        (path / ".git" / "rebase-merge").mkdir()
+    elif state == "dirty":
+        (path / "app.py").write_text("changed = True\n")
+    else:
+        (path / ".gitattributes").write_text("*.py filter=lfs\n")
+        git("add", ".gitattributes")
+        git("commit", "-q", "-m", "attributes")
+    for command in ("modify", "optimize"):
+        with pytest.raises(DomainError) as error:
+            app.execute(command, path)
+        assert error.value.code == code

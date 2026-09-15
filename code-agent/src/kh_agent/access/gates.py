@@ -1,7 +1,11 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from kh_agent.core.enums import PatchState
 from kh_agent.core.errors import DomainError, ErrorCode
+
+if TYPE_CHECKING:
+    from kh_agent.repository.safe_git import TargetSnapshot
 
 
 @dataclass(frozen=True)
@@ -23,6 +27,23 @@ def require_normal_mutation(context: MutationContext) -> None:
         raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED)
     if context.dirty is not False:
         raise DomainError(ErrorCode.DIRTY_WORKTREE_BLOCKED)
+
+
+def require_mutation_target(snapshot: "TargetSnapshot") -> None:
+    """A mutation command needs a Safe Git target that is normal, clean and fully inspected."""
+    head = snapshot.evidence["head"]
+    require_normal_mutation(
+        MutationContext(
+            head["head_state"],
+            head["branch"],
+            head["commit_sha"],
+            "IN_PROGRESS" if snapshot.evidence["git_operations"] else "NORMAL",
+            snapshot.evidence["worktree"]["dirty"],
+        )
+    )
+    # Uncertain comparisons, sparse/partial/blocked object state and replace refs.
+    if not snapshot.mutation_ready:
+        raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED, "Target is not fully inspectable")
 
 
 @dataclass(frozen=True)

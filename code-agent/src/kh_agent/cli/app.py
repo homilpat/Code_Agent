@@ -16,6 +16,7 @@ from kh_agent.core.errors import DomainError, ErrorCode
 from kh_agent.core.ids import CommandRequestId
 from kh_agent.identity.service import IdentityService, current_os_principal
 from kh_agent.repository.identity import RepositoryIdentityResolver
+from kh_agent.repository.safe_git import inspect_target
 from kh_agent.repository.snapshot import SourceScanner
 from kh_agent.security.policy import load_policy
 from kh_agent.store.database import Database
@@ -69,12 +70,19 @@ def _application(ctx: typer.Context, db: Database) -> Application:
     root = Path(ctx.obj).expanduser()
     policy_path = root / "policy" / "security.yaml"
     if not policy_path.exists() and not policy_path.is_symlink():
-        return Application(db)
+        return Application(db, target_inspector=inspect_target)
     repositories = tuple(
         Path(row[0]) for row in db.rows("SELECT canonical_root FROM repository_roots")
     )
     policy = load_policy(root, repositories)
-    return Application(db, scanner=SourceScanner(policy.ingestion), risk_policy=policy.risk)
+    return Application(
+        db,
+        scanner=SourceScanner(policy.ingestion),
+        risk_policy=policy.risk,
+        target_inspector=lambda identity, repository_id: inspect_target(
+            identity, repository_id, policy.ingestion
+        ),
+    )
 
 
 @app.command("policy-check")

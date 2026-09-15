@@ -2,6 +2,19 @@
 
 기준일: 2026-09-15 (Asia/Seoul), 마지막 코드 검증: 2026-09-15
 
+## 2026-09-15: Safe Git 결과를 status와 변경 게이트에 연결
+
+- `require_mutation_target(snapshot)`(`access/gates.py`):
+  - TargetSnapshot의 HEAD·진행 작업·dirty에 기존 `require_normal_mutation` 규칙을 적용한다.
+  - `mutation_ready`가 거짓이면 `REPOSITORY_STATE_BLOCKED`로 막는다. 대상은 비교 불확실, sparse·partial·blocked 객체 상태, replace ref다.
+- `Application`의 선택 인자 `target_inspector`:
+  - `status`: `inspection_scope=SAFE_GIT_PLUMBING`, `commit_sha`, `working_tree_dirty`, `working_tree_diff_hash`, staged·unstaged·untracked·uncertain 수, 객체 출처 권한, `target_completeness`, `target_state_digest`, `mutation_ready`를 표시한다.
+  - 검사에 실패해도 status는 응답하되 `target_inspection_error`와 `mutation_ready=false`만 붙이고 준비됐다고 하지 않는다.
+  - `modify`·`optimize`: 대상 상태가 안전하지 않으면 기능 가용성보다 먼저 거부한다.
+- CLI는 `inspect_target`을 연결한다. 커밋 객체가 없는 가짜 저장소는 Linux에서 HEAD `UNRESOLVED`로 차단된다.
+- 테스트: 게이트 단위 테스트, 실제 git 저장소의 status 표시, detached·merge·rebase·dirty·filter 경로에서 `modify`/`optimize` 차단(M01-IT-007; IT-008·009는 apply 미구현으로 partial).
+- 결과: Linux 185 passed / 1 skipped, Windows 161 passed / 25 skipped, pyright 0 errors, ruff 통과. 설계 테스트 ID 확인 45 / 일부 17 / 없음 49.
+
 ## 2026-09-15: Safe Git inspection adapter 1차와 TargetSnapshot
 
 - `repository/safe_git.py`의 `SafeGitInspector`(Linux, 검사 전용)는 설계 12.9~12.11과 16절, 아키텍처 24.2절을 따른다.
