@@ -2,6 +2,37 @@
 
 기준일: 2026-09-15 (Asia/Seoul), 마지막 코드 검증: 2026-09-15
 
+## 2026-09-15: Safe Git inspection adapter 1차와 TargetSnapshot
+
+- `repository/safe_git.py`의 `SafeGitInspector`(Linux, 검사 전용)는 설계 12.9~12.11과 16절, 아키텍처 24.2절을 따른다.
+- 실행 경계:
+  - 절대경로 git과 고정 plumbing argv만 쓴다.
+  - 환경변수를 새로 구성해 호출자의 `GIT_DIR`, `GIT_ALTERNATE_OBJECT_DIRECTORIES` 등을 무시한다. 빈 HOME, 전역·시스템 설정 무시, `GIT_NO_REPLACE_OBJECTS`, 제한 시간, 출력 한도.
+  - 매 호출 `-c`로 hooks, fsmonitor, 외부 diff, credential helper, pager, attributes 파일, 네트워크 프로토콜을 막는다.
+  - checkout·reset·fetch 같은 변경·네트워크 명령은 제공하지 않는다.
+- 상태 합성(`git status`를 쓰지 않음):
+  - HEAD: 커밋 객체가 확인되면 `NORMAL`/`DETACHED`, HEAD가 branch를 가리키고 ref가 전혀 없으면 `UNBORN`, 그 외 `UNRESOLVED`.
+  - staged: `diff-index --cached`로 HEAD 트리와 index만 비교한다.
+  - unstaged: index blob id와 openat2로 읽어 계산한 git blob hash, 모드를 비교한다. filter·ident·working-tree-encoding 속성 경로, 줄바꿈 변환으로 불일치하는 경로, 민감·읽기 불가 파일은 깨끗하다고 하지 않고 `comparison_uncertain`으로 둔다.
+  - untracked: ingestion 정책(제외 폴더·민감 파일) 범위의 파일만 기록한다.
+  - 객체 출처: alternates가 있으면 `BLOCKED`(신뢰 저장소 등록이 아직 없음). replace ref·partial clone·sparse checkout·skip-worktree를 기록한다.
+- `TargetSnapshot`:
+  - `state_digest`는 캡처 시각을 뺀 저장소 identity·HEAD·진행 작업·객체 상태·변경 기록의 canonical hash다. 원문 소스는 넣지 않는다.
+  - `mutation_ready`는 NORMAL, 진행 작업 없음, 변경 없음, COMPLETE, replace ref 없음일 때만 참이다.
+- 테스트(`tests/test_safe_git_linux.py`, 실제 git 저장소):
+  - clean 결정성
+  - staged·unstaged·relevant untracked, 삭제·모드 변경
+  - unborn과 branch ref 누락 구분
+  - 저장소 설정으로 넣은 fsmonitor·filter·diff·credential 스크립트가 실행되지 않고 해당 경로가 비교 불확실로 표시됨
+  - 호출자 git 환경변수 무시, alternates 차단, replace ref 미추종·감지, sparse·promisor 기록, 진행 중 작업의 준비 불가
+- 결과: Linux 178 passed / 1 skipped, Windows 160 passed / 19 skipped(Linux 전용), pyright 0 errors, ruff 통과. 설계 테스트 ID는 확인 44 / 일부 18 / 없음 49.
+- 남은 일(2차):
+  - `status` 명령과 변경 게이트 연결
+  - 무시된 소스(SNP-004)
+  - 신뢰된 공유 객체 저장소(GIT-001)
+  - partial clone 실측(GIT-004)
+  - gitlink·submodule 경계(BND-005/006)
+
 ## 2026-09-15: evals 실패 원인 분류
 
 - 어떤 부품을 개선할지 고르려고, evals 결과에 시도별 `cause`와 과제별 `failure_cause`를 추가했다.
