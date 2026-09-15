@@ -139,7 +139,9 @@ def load_policy(trusted_root: Path, repository_roots: tuple[Path, ...]) -> Trust
     if sys.platform != "linux":
         raise DomainError(ErrorCode.UNSUPPORTED_PLATFORM)
     root = trusted_root.resolve(strict=True)
-    if any(root.is_relative_to(repo.resolve(strict=True)) for repo in repository_roots):
+    # A deleted or moved registration cannot contain the store, so it must not block loading.
+    existing = tuple(repo.resolve() for repo in repository_roots if repo.exists())
+    if any(root.is_relative_to(repo) for repo in existing):
         raise DomainError(ErrorCode.ACCESS_DENIED, "Repository files cannot be policy authority")
     path = trusted_root.absolute() / "policy" / "security.yaml"
     fd = open_no_alias(os.fsencode(path), os.O_RDONLY | os.O_NOFOLLOW)

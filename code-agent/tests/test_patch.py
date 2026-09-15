@@ -177,13 +177,14 @@ def test_canonical_proposal_persists_with_trusted_request_binding(environment):
     )
     patch = candidate(base, {}, [{"path": "a.py", "operation": "create", "content": "pass"}])
     stored = env.patches.propose(
-        intent_id=intent,
         user_id=env.actor.user_id,
-        base_commit=base.commit_sha,
-        source_snapshot_hash=base.source_snapshot_hash,
-        proposal=patch.payload(),
+        proposal=patch,
         key="proposal",
         classification=Classification.NORMAL,
     )
     assert stored["revision"] == 1
+    row = env.db.rows(
+        "SELECT proposal_base_commit,proposal_source_snapshot_hash FROM patch_revisions"
+    )[0]
+    assert tuple(row) == (base.commit_sha, base.source_snapshot_hash)
     assert env.patches.check_integrity() == {"revisions_checked": 1}

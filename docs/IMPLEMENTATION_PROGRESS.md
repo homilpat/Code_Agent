@@ -1,6 +1,17 @@
 # Code Agent 구현 진행 기록
 
-기준일: 2026-09-14 (Asia/Seoul), 마지막 코드 검증: 2026-09-14
+기준일: 2026-09-15 (Asia/Seoul), 마지막 코드 검증: 2026-09-15
+
+## 2026-09-15: 코드 리뷰 선행 결함 3건 수정
+
+아래 "코드 리뷰 결과" 표의 높음 2건과 `head_state`(중간)를 고쳤다.
+
+- `repository/metadata.py`: 해석된 브랜치 HEAD는 `head_state=NORMAL`. ref 없음은 `UNRESOLVED`, raw oid는 `DETACHED` 유지.
+- `security/policy.py`: 삭제·이동된 등록 저장소 경로는 store 포함 검사에서 제외한다. 존재하는 저장소 안의 store는 경로 순서와 무관하게 `ACCESS_DENIED`.
+- `store/patches.py`: `propose()`는 `CanonicalProposal`만 받는다. intent·base commit·snapshot은 proposal base에서만 도출하고, intent의 repository와 다르거나 dict이면 `INVALID_INPUT`. `intent_id`·`base_commit`·`source_snapshot_hash` 인자는 제거했다.
+- 회귀 테스트: loose·packed `NORMAL`, detached `DETACHED`, 삭제된 등록 저장소가 있어도 정책 로드 진행(순서 무관 `ACCESS_DENIED` 유지), 다른 저장소 base·raw payload 거부, 저장된 base 값이 proposal과 일치. 수정 전 소스에서 실패함을 확인했다.
+- 결과: **136 passed / Linux 전용 5 skipped**, ruff check/format 통과. evals 과제 ca-001/002는 base commit `b8060c7` 고정이라 영향 없다.
+- 다음: 요구사항 ID↔테스트 매핑, ruff `S`/pyright → Safe Git object/index adapter.
 
 ## 2026-09-14 오후 기록: 새 레포 이전, go/no-go 평가, 방향 전환(dev-guard)
 

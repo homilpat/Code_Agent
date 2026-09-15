@@ -54,6 +54,7 @@ class MetadataInspector:
                     if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", value):
                         raise DomainError(ErrorCode.SAFE_GIT_POLICY_BLOCKED)
                     declared_head_oid = value
+                    head_state = "NORMAL"
             elif re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", head):
                 head_state = "DETACHED"
                 declared_head_oid = head
