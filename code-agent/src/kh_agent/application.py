@@ -73,7 +73,7 @@ class Application:
                 raise DomainError(ErrorCode.REPOSITORY_IDENTITY_CHANGED)
             graph = build_graph(snapshot)
             # Recheck after potentially long ingestion, before persistence or display.
-            self.authorization.authorize(identity, repository_id, command)
+            self.authorization.authorize(identity, repository_id, command, "AFTER_SOURCE_INGESTION")
             result = explain(graph, target) if command == "explain" else impact(graph, target)
             if command == "impact" and self.risk_policy:
                 # Static candidate imports cannot prove caller/coverage/runtime/security factors.

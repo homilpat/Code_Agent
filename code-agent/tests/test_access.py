@@ -50,7 +50,11 @@ def test_denied_acl_is_audited_without_metadata_inspection(environment):
         Application(env.db, inspector=ForbiddenInspector()).execute("status", env.repo)
     assert error.value.code == ErrorCode.ACCESS_DENIED
     last = env.db.rows("SELECT payload_json FROM audit_events ORDER BY sequence DESC LIMIT 1")[0]
-    assert json.loads(last[0]) == {"command": "status", "allowed": False}
+    assert json.loads(last[0]) == {
+        "command": "status",
+        "allowed": False,
+        "check_point": "BEFORE_REPOSITORY_ACCESS",
+    }
 
 
 @pytest.mark.req("M01-UT-004", partial=True)

@@ -1,9 +1,12 @@
 import hashlib
+import json
 
 import pytest
 
+from kh_agent.access.service import AuthorizationService
 from kh_agent.analysis.python_graph import build_graph, explain, impact, inspect_python
 from kh_agent.application import Application
+from kh_agent.core.canonical import decode_path
 from kh_agent.core.enums import Permission
 from kh_agent.core.errors import DomainError
 from kh_agent.repository.snapshot import SourceFile, SourceSnapshot
@@ -129,3 +132,47 @@ def test_graph_persistence_and_audit_are_atomic(environment):
     assert len(env.db.rows("SELECT * FROM graph_snapshots")) == 1
     stored = env.db.rows("SELECT graph_json FROM graph_snapshots")[0][0]
     assert "def run(): pass" not in stored
+
+
+def test_impact_resolves_from_imports_src_layout_and_relative_imports():
+    graph = build_graph(
+        snapshot_of(
+            {
+                "src/pkg/__init__.py": b"",
+                "src/pkg/util.py": b"def helper(): pass\n",
+                "src/pkg/main.py": b"from pkg import util\n",
+                "src/pkg/sibling.py": b"from . import util\nfrom .util import helper\n",
+                "app.py": b"import pkg.util\n",
+                "other.py": b"from pkg import helper_module\nimport util\n",
+            }
+        )
+    )
+    found = sorted(
+        (decode_path(item["path"]), item["line"], item["evidence"])
+        for item in impact(graph, "src/pkg/util.py")["import_candidates"]
+    )
+    assert found == [
+        (b"app.py", 1, "ABSOLUTE_IMPORT_NAME_MATCH"),
+        (b"src/pkg/main.py", 1, "ABSOLUTE_IMPORT_NAME_MATCH"),
+        (b"src/pkg/sibling.py", 1, "RELATIVE_IMPORT_RESOLVED"),
+        (b"src/pkg/sibling.py", 2, "RELATIVE_IMPORT_RESOLVED"),
+    ]
+
+
+def test_acl_recheck_after_ingestion_is_distinguishable_in_audit(environment):
+    env = environment
+
+    class Scanner:
+        def scan(self, repository):
+            return snapshot_of({"lib.py": b"def run(): pass"})
+
+    Application(env.db, scanner=Scanner()).execute("explain", env.repo, "lib.py")
+    rows = env.db.rows(
+        "SELECT payload_json FROM audit_events WHERE event_type='ACL_CHECKED' ORDER BY sequence"
+    )
+    assert [json.loads(row[0])["check_point"] for row in rows[-2:]] == [
+        "BEFORE_REPOSITORY_ACCESS",
+        "AFTER_SOURCE_INGESTION",
+    ]
+    with pytest.raises(DomainError):
+        AuthorizationService(env.db).authorize(env.actor, env.repository_id, "explain", "ANY")

@@ -136,6 +136,7 @@ AUDIT_FIELDS = frozenset(
         "root_id",
         "target_user_id",
         "request_type",
+        "check_point",
     }
 )
 

@@ -18,6 +18,11 @@ COMMAND_PERMISSIONS = {
 }
 
 
+# Protected commands are authorized before touching the repository and again after long
+# ingestion; the audit event records which of the two checks it was.
+CHECK_POINTS = frozenset({"BEFORE_REPOSITORY_ACCESS", "AFTER_SOURCE_INGESTION"})
+
+
 @dataclass(frozen=True)
 class AuthorizedRepository:
     repository_id: str
@@ -30,10 +35,16 @@ class AuthorizationService:
         self.db = db
 
     def authorize(
-        self, identity: Identity, repository_id: str, command: str
+        self,
+        identity: Identity,
+        repository_id: str,
+        command: str,
+        check_point: str = "BEFORE_REPOSITORY_ACCESS",
     ) -> AuthorizedRepository:
         if command not in COMMAND_PERMISSIONS:
             raise DomainError(ErrorCode.INVALID_INPUT, "Unknown command")
+        if check_point not in CHECK_POINTS:
+            raise DomainError(ErrorCode.INVALID_INPUT, "Unknown authorization check point")
         with self.db.transaction() as conn:
             user = conn.execute(
                 "SELECT active FROM users WHERE user_id=?", (identity.user_id,)
@@ -58,7 +69,7 @@ class AuthorizationService:
                 aggregate_id=repository_id,
                 repository_id=repository_id,
                 user_id=identity.user_id,
-                payload={"command": command, "allowed": allowed},
+                payload={"command": command, "allowed": allowed, "check_point": check_point},
             )
         # Denial is raised after commit, so the denial event remains durable.
         if not allowed:
