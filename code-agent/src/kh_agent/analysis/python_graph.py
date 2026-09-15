@@ -3,11 +3,12 @@ import io
 import os
 import tokenize
 
-from kh_agent.core.canonical import canonical_hash, encode_path
+from kh_agent.core.canonical import canonical_hash, decode_path, encode_path
 from kh_agent.core.errors import DomainError, ErrorCode
 from kh_agent.repository.snapshot import SourceSnapshot
 
-BUILDER_VERSION = "python-ast-v1"
+# v2 records the names imported by `from x import y`, which impact needs.
+BUILDER_VERSION = "python-ast-v2"
 
 
 def dotted_name(node: ast.AST) -> str | None:
@@ -81,7 +82,12 @@ def inspect_python(data: bytes) -> dict:
             )
         elif isinstance(node, ast.ImportFrom):
             imports.append(
-                {"module": node.module or "", "relative_level": node.level, "line": node.lineno}
+                {
+                    "module": node.module or "",
+                    "names": sorted(alias.name for alias in node.names),
+                    "relative_level": node.level,
+                    "line": node.lineno,
+                }
             )
         elif isinstance(node, ast.Call):
             name = dotted_name(node.func)
@@ -158,22 +164,71 @@ def explain(graph: dict, target: str) -> dict:
     }
 
 
+def module_names(path: str, packages: set[str]) -> set[str]:
+    """Dotted names a file can be imported as: from the scan root and from its package root.
+
+    `src/pkg/util.py` with `src/pkg/__init__.py` is both `src.pkg.util` and `pkg.util`. A bare
+    file name is only used at the scan root, so an unrelated `import util` is not a match.
+    """
+    parts = path[:-3].split("/")
+    is_package = parts[-1] == "__init__"
+    if is_package:
+        parts = parts[:-1]
+    if not parts:
+        return set()
+    names = {".".join(parts)}
+    root = len(parts) - 1
+    while root > 0 and "/".join(parts[:root]) + "/__init__.py" in packages:
+        root -= 1
+    if root < len(parts) - 1 or is_package:
+        names.add(".".join(parts[root:]))
+    return names
+
+
+def imported_names(module: str, imported: dict) -> set[str]:
+    """`from pkg import util` references both `pkg` and `pkg.util`."""
+    names = {module} if module else set()
+    names.update(
+        f"{module}.{name}" if module else name for name in imported.get("names", []) if name != "*"
+    )
+    return names
+
+
+def relative_import_names(importer: str, imported: dict) -> set[str]:
+    package = importer[:-3].split("/")[:-1]
+    keep = len(package) - (imported["relative_level"] - 1)
+    if keep < 0:
+        return set()
+    base = package[:keep] + (imported["module"].split(".") if imported["module"] else [])
+    return imported_names(".".join(base), imported)
+
+
 def impact(graph: dict, target: str) -> dict:
     target_view = explain(graph, target)
     if not target.endswith(".py"):
         raise DomainError(ErrorCode.INVALID_INPUT)
-    module_name = target[:-3].replace("/", ".")
-    if module_name.endswith(".__init__"):
-        module_name = module_name[:-9]
+    paths = [os.fsdecode(decode_path(module["path"])) for module in graph["modules"]]
+    packages = {path for path in paths if path == "__init__.py" or path.endswith("/__init__.py")}
+    targets = module_names(target, packages)
     candidates = []
-    for module in graph["modules"]:
+    for path, module in zip(paths, graph["modules"], strict=True):
+        if path == target:
+            continue
         for imported in module["imports"]:
-            if imported["relative_level"] == 0 and imported["module"] == module_name:
+            relative = imported["relative_level"] > 0
+            referenced = (
+                relative_import_names(path, imported)
+                if relative
+                else imported_names(imported["module"], imported)
+            )
+            if targets & referenced:
                 candidates.append(
                     {
                         "path": module["path"],
                         "line": imported["line"],
-                        "evidence": "ABSOLUTE_IMPORT_NAME_MATCH",
+                        "evidence": (
+                            "RELATIVE_IMPORT_RESOLVED" if relative else "ABSOLUTE_IMPORT_NAME_MATCH"
+                        ),
                         "confidence": "CANDIDATE_REQUIRES_IMPORT_ROOT_RESOLUTION",
                     }
                 )

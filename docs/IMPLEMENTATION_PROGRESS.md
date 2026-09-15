@@ -2,6 +2,18 @@
 
 기준일: 2026-09-15 (Asia/Seoul), 마지막 코드 검증: 2026-09-15
 
+## 2026-09-15: `impact` import 누락과 ACL 재확인 기록 구분 수정
+
+- `impact`(`analysis/python_graph.py`):
+  - `from pkg import util`은 `pkg`만 기록돼 `pkg/util.py`의 후보를 찾지 못했다. 이제 from-import의 이름까지 기록한다(builder `python-ast-v2`).
+  - 대상 파일은 경로 기준 이름(`src.pkg.util`)과 `__init__.py` 패키지 루트 기준 이름(`pkg.util`)으로 매칭한다.
+  - 상대 import(`from . import util`, `from .util import x`)는 import하는 파일 위치로 풀어 `RELATIVE_IMPORT_RESOLVED`로 표시한다.
+  - 패키지가 아닌 곳의 파일명만으로는 매칭하지 않아 무관한 `import util`은 후보가 아니다.
+  - 결과는 여전히 후보(`impact_complete=false`)이며, 정확한 참조는 LSP 단계가 담당한다.
+- ACL 기록(`access/service.py`): 보호 명령은 소스 수집 전과 후에 권한을 두 번 확인한다. 두 `ACL_CHECKED` 이벤트를 `check_point`(`BEFORE_REPOSITORY_ACCESS` / `AFTER_SOURCE_INGESTION`)로 구분하고, 그 외 값은 거부한다.
+- 회귀 테스트: from-import·`src/` 구조·상대 import와 무관 import 배제, ACL 재확인 구분. 수정 전 소스에서 3개 실패를 확인했다.
+- 결과: Linux 167 passed / 1 skipped(CLI `impact`에서 `pkg/main.py` 후보 확인), Windows 159 passed / 9 skipped, pyright 0 errors, ruff 통과.
+
 ## 2026-09-15: 설계 테스트 ID ↔ 테스트 매핑
 
 - `tests/conftest.py`에 다음을 추가했다.
