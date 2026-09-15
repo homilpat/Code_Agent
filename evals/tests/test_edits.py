@@ -38,6 +38,7 @@ def test_rejected_replies_write_nothing(tmp_path, reply):
     with pytest.raises(EditError) as error:
         apply_edits(tmp_path, parse_edits(reply))
     assert error.value.category == "APPLY_ERROR"
+    assert error.value.path in {"a.py", "../outside.py"}
     assert (tmp_path / "a.py").read_bytes() == original
     assert not (tmp_path.parent / "outside.py").exists()
 

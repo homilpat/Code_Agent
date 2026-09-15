@@ -21,12 +21,14 @@ class Edit:
 
 
 class EditError(Exception):
-    """Model-facing failure. ``category`` is FORMAT_ERROR or APPLY_ERROR."""
+    """Model-facing failure. ``category`` is FORMAT_ERROR or APPLY_ERROR; ``path`` names the
+    target file when the failure concerns one."""
 
-    def __init__(self, category: str, message: str):
+    def __init__(self, category: str, message: str, path: str | None = None):
         super().__init__(message)
         self.category = category
         self.message = message
+        self.path = path
 
 
 def parse_edits(text: str) -> list[Edit]:
@@ -56,12 +58,14 @@ def apply_edits(project: Path, edits: list[Edit]) -> dict[str, str | None]:
         if not edit.search:
             if content is not None:
                 raise EditError(
-                    "APPLY_ERROR", f"{relative}: an empty SEARCH creates a file, but it exists."
+                    "APPLY_ERROR",
+                    f"{relative}: an empty SEARCH creates a file, but it exists.",
+                    relative,
                 )
             updated[relative] = edit.replace
             continue
         if content is None:
-            raise EditError("APPLY_ERROR", f"{relative}: file does not exist.")
+            raise EditError("APPLY_ERROR", f"{relative}: file does not exist.", relative)
         count = content.count(edit.search)
         if count != 1:
             problem = "did not match" if count == 0 else f"matched {count} times"
@@ -69,6 +73,7 @@ def apply_edits(project: Path, edits: list[Edit]) -> dict[str, str | None]:
                 "APPLY_ERROR",
                 f"{relative}: SEARCH section {problem}. Copy the current lines exactly and "
                 "include enough unchanged lines to make the match unique.",
+                relative,
             )
         updated[relative] = content.replace(edit.search, edit.replace, 1)
     previous = {}
@@ -106,7 +111,7 @@ def _relative_path(project: Path, raw: str) -> str:
         or ":" in raw
         or not (project / candidate).resolve().is_relative_to(project.resolve())
     ):
-        raise EditError("APPLY_ERROR", f"{raw}: path must be relative to the project root.")
+        raise EditError("APPLY_ERROR", f"{raw}: path must be relative to the project root.", raw)
     return candidate.as_posix()
 
 

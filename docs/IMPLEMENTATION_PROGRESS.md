@@ -2,6 +2,21 @@
 
 기준일: 2026-09-15 (Asia/Seoul), 마지막 코드 검증: 2026-09-15
 
+## 2026-09-15: evals 실패 원인 분류
+
+- 어떤 부품을 개선할지 고르려고, evals 결과에 시도별 `cause`와 과제별 `failure_cause`를 추가했다.
+- 모델 답변 문장은 쓰지 않고 판정과 수정된 파일만으로 정한다. 기준은 정답 패치(`solution.edits`)가 고치는 파일이다.
+  - `LOCALIZATION`: 정답 패치 밖 파일만 고쳐 실패
+  - `FORMAT`: 형식 오류, 출력 잘림, 맞는 파일인데 SEARCH 불일치
+  - `LOGIC`: 정답 파일을 고쳤지만 테스트 실패·회귀
+  - `TEST_ENVIRONMENT`, `MODEL_CALL`
+  - `UNDETERMINED`: 시간 초과, 시도 없음
+- 적용 오류(`EditError`)가 대상 파일 경로를 담는다. `run` 출력에 과제별 원인과 원인별 합계를 표시하고, 표는 `evals/README.md`에 있다.
+- 검증:
+  - 분류 규칙 13가지 테스트, 과제 정답 패치 경로 검사, 적용 오류 경로 검사
+  - 가짜 모델로 `solve`를 끝까지 실행: 잘못된 파일 → `APPLY_ERROR`/`LOCALIZATION`, 이어서 정답 → `PASS`
+  - evals 테스트 23 passed, `validate` 2/2 VALID
+
 ## 2026-09-15: `impact` import 누락과 ACL 재확인 기록 구분 수정
 
 - `impact`(`analysis/python_graph.py`):

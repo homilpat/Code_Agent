@@ -5,6 +5,7 @@ import json
 import re
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 from evals.runner.llm import ChatClient
@@ -63,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     slug = re.sub(r"[^A-Za-z0-9._-]+", "_", args.model)
     output = RESULTS_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}_{slug}.jsonl"
     passed = 0
+    causes: Counter[str] = Counter()
     with output.open("a", encoding="utf-8") as stream:
         for task in tasks:
             result = solve(
@@ -72,11 +74,15 @@ def main(argv: list[str] | None = None) -> int:
             stream.write(json.dumps(result, ensure_ascii=False) + "\n")
             stream.flush()
             passed += result["success"]
+            if result["failure_cause"]:
+                causes[result["failure_cause"]] += 1
             print(
-                f"{result['verdict']:<13} {task.id}  "
+                f"{result['verdict']:<13} {result['failure_cause'] or '-':<16} {task.id}  "
                 f"attempts={result['attempts_used']}  {result['seconds']}s"
             )
     print(f"passed {passed}/{len(tasks)} -> {output.relative_to(REPO_ROOT)}")
+    if causes:
+        print("failure causes: " + ", ".join(f"{name}={n}" for name, n in causes.most_common()))
     return 0
 
 

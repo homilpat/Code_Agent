@@ -2,7 +2,7 @@
 
 import difflib
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from evals.runner.edits import EditError, apply_edits, parse_edits
 from evals.runner.llm import ChatClient, LLMError
@@ -19,6 +19,31 @@ def judge(task: Task, report: TestReport) -> str:
     if report.failed:
         return "REGRESSION"
     return "PASS"
+
+
+def failure_cause(verdict: str, edited: set[str], solution_files: set[str]) -> str | None:
+    """Which part of the loop to improve, derived from the verdict and edited files only.
+
+    LOCALIZATION: every edited file lies outside the reference solution (wrong place).
+    FORMAT: an unparseable or truncated reply, or SEARCH text that does not match its file.
+    LOGIC: a solution file was edited but required tests still fail or others regress.
+    TEST_ENVIRONMENT / MODEL_CALL: harness or model endpoint failures.
+    UNDETERMINED: a timeout or no attempt cannot be attributed without more evidence.
+    The reference solution is one valid fix, so LOCALIZATION is only assigned to failures.
+    """
+    if verdict == "PASS":
+        return None
+    if verdict in {"FORMAT_ERROR", "TRUNCATED"}:
+        return "FORMAT"
+    if verdict in {"APPLY_ERROR", "TEST_FAIL", "REGRESSION"}:
+        if edited and not edited & solution_files:
+            return "LOCALIZATION"
+        return "FORMAT" if verdict == "APPLY_ERROR" else "LOGIC"
+    if verdict == "LLM_ERROR":
+        return "MODEL_CALL"
+    if verdict == "HARNESS_ERROR":
+        return "TEST_ENVIRONMENT"
+    return "UNDETERMINED"
 
 
 def validate(repo_root: Path, task: Task, python: str, timeout: int, keep: bool) -> dict:
@@ -70,6 +95,10 @@ def solve(
     log: list[dict] = []
     verdict = "NO_ATTEMPT"
     try:
+        solution = parse_edits(task.solution.read_text(encoding="utf-8"))
+        solution_files = {
+            PurePosixPath(edit.path.replace("\\", "/")).as_posix() for edit in solution
+        }
         workspace.check_import_isolation(python)
         messages = initial_messages(task, workspace.project)
         for attempt in range(1, attempts + 1):
@@ -79,7 +108,7 @@ def solve(
                 completion = client.complete(messages)
             except LLMError as exc:
                 verdict = "LLM_ERROR"
-                entry.update(verdict=verdict, detail=str(exc))
+                entry.update(verdict=verdict, detail=str(exc), cause="MODEL_CALL")
                 break
             entry.update(
                 llm_seconds=round(completion.seconds, 1),
@@ -93,7 +122,11 @@ def solve(
             except EditError as exc:
                 truncated = exc.category == "FORMAT_ERROR" and completion.finish_reason == "length"
                 verdict = "TRUNCATED" if truncated else exc.category
-                entry.update(verdict=verdict, detail=exc.message)
+                entry.update(
+                    verdict=verdict,
+                    detail=exc.message,
+                    cause=failure_cause(verdict, {exc.path} if exc.path else set(), solution_files),
+                )
                 messages.append(
                     {
                         "role": "user",
@@ -110,6 +143,7 @@ def solve(
                 test_seconds=round(report.seconds, 1),
                 failed=sorted(report.failed)[:20],
                 flaky=sorted(report.flaky),
+                cause=failure_cause(verdict, set(previous), solution_files),
             )
             if verdict == "PASS":
                 break
@@ -120,9 +154,9 @@ def solve(
                 }
             )
         diff = _diff(workspace.project, originals)
-    except RuntimeError as exc:
+    except (RuntimeError, EditError) as exc:  # EditError here means an unusable reference solution
         verdict = "HARNESS_ERROR"
-        log.append({"verdict": verdict, "detail": str(exc)})
+        log.append({"verdict": verdict, "detail": str(exc), "cause": "TEST_ENVIRONMENT"})
         diff = ""
     finally:
         if not keep:
@@ -132,6 +166,9 @@ def solve(
         "model": client.model,
         "success": verdict == "PASS",
         "verdict": verdict,
+        "failure_cause": None
+        if verdict == "PASS"
+        else next((entry["cause"] for entry in reversed(log) if "cause" in entry), "UNDETERMINED"),
         "attempts_used": sum(1 for entry in log if "attempt" in entry),
         "seconds": round(time.monotonic() - started, 1),
         "touched_tests": any(path.startswith("tests/") for path in originals),
