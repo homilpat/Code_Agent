@@ -4,7 +4,13 @@ import pytest
 
 from kh_agent.analysis.risk import FactorEvidence, FactorRule, RiskPolicy, score_risk
 from kh_agent.core.errors import DomainError
-from kh_agent.sandbox.policy import PytestRequest, compile_pytest, docker_plan
+from kh_agent.sandbox.policy import PytestRequest, compile_pytest, container_plan
+
+
+def docker_plan(command, **options):
+    return container_plan(
+        command, runtime="docker", apparmor_profile="knowledge-hub-verification-v1", **options
+    )
 
 
 def policy():
@@ -124,6 +130,62 @@ def test_sandbox_plan_has_no_host_or_network_execution_authority():
             trusted_config="/config",
             container_name="kh-test",
         )
+
+
+def test_podman_plan_uses_runtime_syntax_and_adds_apparmor_only_when_attested():
+    command = compile_pytest(PytestRequest(("tests",)))
+    assert command.argv[:3] == ("/usr/local/bin/python", "-I", "-B")
+    assert "--rootdir=/workspace/src" in command.argv and "no:cacheprovider" in command.argv
+    options = dict(
+        image="sha256:" + "b" * 64,
+        source_view="/private/src",
+        trusted_config="/private/pytest.ini",
+        container_name="kh-abc",
+    )
+    argv = container_plan(command, runtime="podman", **options)["argv"]
+    assert argv[0] == "podman" and "--security-opt=no-new-privileges" in argv
+    assert "type=bind,src=/private/src,dst=/workspace/src,ro=true" in argv
+    assert not any("apparmor" in item for item in argv) and "--rm" not in argv
+    assert not any("nr_inodes" in item for item in argv)
+    assert any("nr_inodes=16384" in item for item in docker_plan(command, **options)["argv"])
+    for runtime, lsm in (("runc", None), ("podman", "Bad Profile")):
+        with pytest.raises(DomainError):
+            container_plan(command, runtime=runtime, apparmor_profile=lsm, **options)
+
+
+def attested_info():
+    return {
+        "version": {"Version": "4.9.3"},
+        "host": {
+            "cgroupVersion": "v2",
+            "cgroupControllers": ["cpu", "memory", "pids"],
+            "security": {"rootless": True, "seccompEnabled": True, "apparmorEnabled": False},
+            "ociRuntime": {"name": "crun"},
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "missing, change",
+    [
+        ("ROOTLESS", lambda info: info["host"]["security"].update(rootless=False)),
+        ("CGROUP_V2", lambda info: info["host"].update(cgroupVersion="v1")),
+        ("CGROUP_CONTROLLERS", lambda info: info["host"].update(cgroupControllers=["cpu"])),
+        ("SECCOMP", lambda info: info["host"]["security"].update(seccompEnabled=False)),
+    ],
+)
+def test_runtime_attestation_requires_rootless_limits_and_seccomp(missing, change):
+    from kh_agent.sandbox.container import attestation_from_info
+
+    attested = attestation_from_info("/usr/bin/podman", attested_info())
+    assert attested.capabilities["lsm"] == "NONE"
+    assert attested.capabilities["network_mode"] == "NONE"
+    assert attested.capabilities["secret_inheritance"] == "NONE"  # noqa: S105 - not a credential
+    broken = attested_info()
+    change(broken)
+    with pytest.raises(DomainError) as error:
+        attestation_from_info("/usr/bin/podman", broken)
+    assert missing in error.value.message
 
 
 def test_forged_compiled_command_cannot_add_credentials_or_shell():
