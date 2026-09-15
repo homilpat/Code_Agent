@@ -16,8 +16,11 @@ import sys
 import tempfile
 import threading
 import time
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
+from typing import IO
 
 from kh_agent.core.canonical import canonical_hash
 from kh_agent.core.errors import DomainError, ErrorCode
@@ -34,6 +37,7 @@ MANAGED_LABEL = "knowledge-hub.managed=true"
 REQUIRED_CONTROLLERS = frozenset({"cpu", "memory", "pids"})
 # pytest exit codes: 0 passed, 1 tests failed, 5 no tests collected; others are runner errors.
 PYTEST_STATUS = {0: "PASS", 1: "FAIL", 5: "INCONCLUSIVE"}
+STDERR_TAIL_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -53,6 +57,16 @@ class SandboxResult:
     output_truncated: bool
     output_sha256: str
     wall_seconds: float
+    plan_hash: str
+    attestation_digest: str
+
+
+@dataclass(frozen=True)
+class SandboxedServer:
+    stdin: IO[bytes]
+    stdout: IO[bytes]
+    kill: Callable[[], object]
+    stderr_tail: Callable[[], bytes]
     plan_hash: str
     attestation_digest: str
 
@@ -197,27 +211,99 @@ class RootlessContainerBackend:
             self._runtime("rm", "--force", "--time", "0", name)
         return len(names)
 
+    def _plan(
+        self, command: CompiledCommand, snapshot: SourceSnapshot, root: Path, name: str
+    ) -> dict:
+        view = materialize_source_view(snapshot, root)
+        config = root / "pytest.ini"
+        config.write_text(TRUSTED_PYTEST_INI, encoding="utf-8")
+        config.chmod(0o644)
+        return container_plan(
+            command,
+            runtime=self.attestation.runtime,
+            image=self.image,
+            source_view=str(view),
+            trusted_config=str(config),
+            container_name=name,
+            profile=self.profile,
+            apparmor_profile=None,
+        )
+
     def execute(self, command: CompiledCommand, snapshot: SourceSnapshot) -> SandboxResult:
         name = "kh-" + secrets.token_hex(8)
         with tempfile.TemporaryDirectory(prefix="kh-sandbox-") as private:
-            root = Path(private)
-            view = materialize_source_view(snapshot, root)
-            config = root / "pytest.ini"
-            config.write_text(TRUSTED_PYTEST_INI, encoding="utf-8")
-            config.chmod(0o644)
-            plan = container_plan(
-                command,
-                runtime=self.attestation.runtime,
-                image=self.image,
-                source_view=str(view),
-                trusted_config=str(config),
-                container_name=name,
-                profile=self.profile,
-                apparmor_profile=None,
-            )
+            plan = self._plan(command, snapshot, Path(private), name)
+            if plan["interactive"]:
+                raise DomainError(ErrorCode.INVALID_INPUT, "Server templates need a session")
             try:
                 return self._run(plan, name, command.timeout_seconds)
             finally:
+                self._runtime("rm", "--force", "--time", "0", name)
+
+    @contextmanager
+    def language_server(
+        self, command: CompiledCommand, snapshot: SourceSnapshot
+    ) -> Iterator[SandboxedServer]:
+        """A long-lived stdio server in the same sandbox, removed on exit or at session end."""
+        name = "kh-" + secrets.token_hex(8)
+        with tempfile.TemporaryDirectory(prefix="kh-sandbox-") as private:
+            plan = self._plan(command, snapshot, Path(private), name)
+            if not plan["interactive"]:
+                raise DomainError(ErrorCode.INVALID_INPUT, "Command is not a server template")
+            process = subprocess.Popen(  # noqa: S603 - attested runtime executable, validated plan
+                [self.attestation.executable, *plan["argv"][1:]],
+                env=runtime_environment(),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            tail = bytearray()
+
+            def drain_stderr() -> None:
+                stream = process.stderr
+                while stream is not None and (chunk := os.read(stream.fileno(), 65536)):
+                    tail.extend(chunk)
+                    del tail[:-STDERR_TAIL_BYTES]
+
+            def stop() -> None:
+                # Closing stdin works even before the container exists; the server sees EOF
+                # and every later write fails. The runtime kill covers a server ignoring EOF.
+                with suppress(OSError, ValueError):
+                    if process.stdin is not None:
+                        process.stdin.close()
+                self._runtime("kill", name)
+
+            threading.Thread(target=drain_stderr, daemon=True).start()
+            expiry = threading.Timer(command.timeout_seconds, stop)
+            expiry.daemon = True
+            expiry.start()
+            try:
+                if process.stdin is None or process.stdout is None:
+                    raise DomainError(ErrorCode.CAPABILITY_NOT_AVAILABLE, "Server pipes missing")
+                yield SandboxedServer(
+                    process.stdin,
+                    process.stdout,
+                    stop,
+                    lambda: bytes(tail),
+                    plan["plan_hash"],
+                    self.attestation.digest,
+                )
+            finally:
+                expiry.cancel()
+                with suppress(OSError, ValueError):
+                    if process.stdin is not None:
+                        process.stdin.close()
+                # Remove only after the runtime client exits, so a container created late is
+                # never left behind.
+                try:
+                    process.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    self._runtime("kill", name)
+                    try:
+                        process.wait(timeout=30)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
                 self._runtime("rm", "--force", "--time", "0", name)
 
     def _run(self, plan: dict, name: str, timeout: int) -> SandboxResult:

@@ -2,6 +2,21 @@
 
 기준일: 2026-09-15 (Asia/Seoul), 마지막 코드 검증: 2026-09-15
 
+## 2026-09-15: sandbox 안의 Python LSP 클라이언트 (L1)
+
+- 설계 M02-LNG-011(의미 LSP 요청은 M06 경유)을 따른다. 서버 프로세스는 rootless sandbox 컨테이너 안에서만 실행한다.
+- `sandbox/lsp.py`:
+  - `read_message`/`encode_message`: Content-Length 틀. 헤더 줄·줄 수·본문 크기 한도, 중복·음수·누락 Content-Length 거부, JSON-RPC 2.0 객체만 허용.
+  - `LspSession`: 세션 전체 바이트 한도, 정수 id 응답 매칭, 시간 초과 시 `$/cancelRequest`, 서버 종료·한도 초과 시 대기 요청 실패와 `on_failure`(서버 중지). 서버 요청은 고정 목록만 빈 결과로 응답하고 `workspace/configuration`은 기본값, 나머지는 MethodNotFound. 서버 오류 문구는 반환하지 않는다.
+  - `PythonLanguageClient`: initialize 후 pyright의 `Found N source files` 로그를 기다린다. 그 전의 references는 열지 않은 파일을 빠뜨리므로, 로그가 없으면 실패로 처리한다.
+  - `parse_locations`: source view 밖·`..`·`.git`·퍼센트 인코딩 우회 URI는 저장소 경로로 반환하지 않는다(`path=None`).
+- `sandbox/policy.py`: `compile_language_server`(`python-pyright-lsp-v1`), `registered_command`(pytest·LSP 템플릿 재컴파일 비교), 서버 템플릿에만 `--interactive`.
+- `sandbox/container.py`: `RootlessContainerBackend.language_server()` — 세션 수명 타이머, stdin 닫기와 runtime kill로 중지, stderr 끝부분 보관, runtime 클라이언트 종료 후 컨테이너 삭제. `execute`는 서버 템플릿을 거부한다.
+- `config/sandbox/python-pyright.Containerfile`: digest 고정 node 22, pyright 1.1.414(`--ignore-scripts`), 비 root 사용자.
+- 테스트: 프로토콜·세션·URI 경계(모든 플랫폼), 서버 템플릿 위조 거부, Linux 실측(정의, 열지 않은 파일 참조, stdlib 정의는 경로 없음, 타입 오류 진단, kill 후 실패, 컨테이너 잔존 없음).
+- 결과: Linux 218 passed / 1 skipped, Windows 186 passed / 33 skipped, pyright 0 errors, ruff 통과. 설계 테스트 ID 확인 45 / 일부 17 / 없음 49.
+- 한계: 서버는 source view의 `.py` 파일과 내장 stdlib stub만 본다. 저장소의 pyright 설정과 서드파티 패키지는 반영하지 않는다.
+
 ## 2026-09-15: rootless 컨테이너 sandbox backend (M06 1차)
 
 - `sandbox/policy.py`:
