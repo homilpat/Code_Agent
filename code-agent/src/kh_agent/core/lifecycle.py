@@ -29,7 +29,6 @@ class CheckResult:
     status: CheckStatus
     required: bool
     evidence_hash: str
-    na_decision_reference: str | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -49,11 +48,11 @@ def verification_outcome(checks: tuple[CheckResult, ...]) -> PatchState:
         raise DomainError(ErrorCode.INVALID_INPUT, "Duplicate verification check")
     if any(check.status == CheckStatus.FAIL for check in required):
         return PatchState.FAILED
+    # A required check must PASS with evidence. NOT_APPLICABLE would need a trusted
+    # applicability predicate (CONDITIONAL requiredness) that plans cannot express yet,
+    # so a caller-supplied reference can no longer exempt a required check.
     if not required or any(
-        not check.evidence_hash
-        or check.status in (CheckStatus.INCONCLUSIVE, CheckStatus.NOT_AVAILABLE)
-        or (check.status == CheckStatus.NOT_APPLICABLE and not check.na_decision_reference)
-        for check in required
+        check.status != CheckStatus.PASS or not check.evidence_hash for check in required
     ):
         return PatchState.INCONCLUSIVE
     return PatchState.VERIFIED

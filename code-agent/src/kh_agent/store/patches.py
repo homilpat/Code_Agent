@@ -17,7 +17,7 @@ from kh_agent.core.ids import (
 from kh_agent.core.lifecycle import CheckResult, require_transition, verification_outcome
 from kh_agent.patch.canonical import CanonicalProposal
 from kh_agent.store.artifacts import Artifact, ArtifactBackend
-from kh_agent.store.database import Database, append_event
+from kh_agent.store.database import Database, append_event, verify_audit_chain
 
 
 class PatchStore:
@@ -408,6 +408,7 @@ class PatchStore:
     def check_integrity(self) -> dict:
         """Read-only startup reconciliation: corruption never creates authority."""
         with self.db.transaction() as conn:
+            audit_events = verify_audit_chain(conn)
             rows = conn.execute("SELECT * FROM patch_revisions").fetchall()
             for row in rows:
                 state = PatchState.PROPOSED
@@ -464,4 +465,4 @@ class PatchStore:
                             raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED)
                 elif state in (PatchState.VERIFIED, PatchState.APPROVED, PatchState.APPLIED):
                     raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED)
-        return {"revisions_checked": len(rows)}
+        return {"revisions_checked": len(rows), "audit_events_checked": audit_events}

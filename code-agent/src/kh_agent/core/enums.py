@@ -31,6 +31,7 @@ class CheckStatus(StrEnum):
     INCONCLUSIVE = "INCONCLUSIVE"
     NOT_AVAILABLE = "NOT_AVAILABLE"
     NOT_APPLICABLE = "NOT_APPLICABLE"
+    ERROR = "ERROR"  # the runner or parser could not produce a contract result
 
 
 class Classification(StrEnum):

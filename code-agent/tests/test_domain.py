@@ -74,11 +74,20 @@ def test_cannot_skip_verification_to_approval(state):
 
 def test_required_verification_unknown_never_passes():
     assert verification_outcome(()) == PatchState.INCONCLUSIVE
-    for status in (CheckStatus.NOT_AVAILABLE, CheckStatus.INCONCLUSIVE, CheckStatus.NOT_APPLICABLE):
+    for status in (
+        CheckStatus.NOT_AVAILABLE,
+        CheckStatus.INCONCLUSIVE,
+        CheckStatus.NOT_APPLICABLE,
+        CheckStatus.ERROR,
+    ):
         assert (
             verification_outcome((CheckResult("test", status, True, "a" * 64),))
             == PatchState.INCONCLUSIVE
         )
+    assert (
+        verification_outcome((CheckResult("test", CheckStatus.PASS, True, ""),))
+        == PatchState.INCONCLUSIVE
+    )
     assert (
         verification_outcome((CheckResult("test", CheckStatus.FAIL, True, "a" * 64),))
         == PatchState.FAILED
@@ -86,8 +95,20 @@ def test_required_verification_unknown_never_passes():
     checks = (
         CheckResult("test", CheckStatus.PASS, True, "a" * 64),
         CheckResult("optional", CheckStatus.INCONCLUSIVE, False, ""),
+        CheckResult("optional-error", CheckStatus.ERROR, False, ""),
+        CheckResult("optional-na", CheckStatus.NOT_APPLICABLE, False, ""),
     )
     assert verification_outcome(checks) == PatchState.VERIFIED
+
+
+def test_required_check_cannot_exempt_itself_as_not_applicable():
+    # No caller-supplied reference field exists any more to justify the exemption.
+    assert "na_decision_reference" not in CheckResult.__dataclass_fields__
+    checks = (
+        CheckResult("lint", CheckStatus.PASS, True, "a" * 64),
+        CheckResult("test", CheckStatus.NOT_APPLICABLE, True, "b" * 64),
+    )
+    assert verification_outcome(checks) == PatchState.INCONCLUSIVE
 
 
 def test_ambiguous_selector_never_selects_latest():

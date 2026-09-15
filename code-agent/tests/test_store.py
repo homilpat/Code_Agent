@@ -10,7 +10,7 @@ from kh_agent.core.errors import DomainError, ErrorCode
 from kh_agent.core.ids import RepositoryId
 from kh_agent.core.lifecycle import CheckResult
 from kh_agent.patch.canonical import ProposalBase, canonicalize_candidate
-from kh_agent.store.database import Database, append_event
+from kh_agent.store.database import Database, append_event, verify_audit_chain
 from kh_agent.store.patches import PatchStore
 
 
@@ -121,6 +121,48 @@ def test_append_only_audit(environment):
     assert len(environment.db.rows("SELECT * FROM audit_events")) == 2
 
 
+def test_audit_events_form_a_verified_hash_chain(environment):
+    rows = environment.db.rows(
+        "SELECT sequence,previous_event_digest,event_digest FROM audit_events ORDER BY sequence"
+    )
+    assert [row["sequence"] for row in rows] == [1, 2]
+    assert rows[0]["previous_event_digest"] is None
+    assert rows[1]["previous_event_digest"] == rows[0]["event_digest"]
+    with environment.db.transaction() as conn:
+        assert verify_audit_chain(conn) == 2
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        """UPDATE audit_events SET payload_json='{"reason_code":"forged"}' WHERE sequence=1""",
+        "UPDATE audit_events SET created_at='2000-01-01T00:00:00Z' WHERE sequence=2",
+        "DELETE FROM audit_events WHERE sequence=1",
+    ],
+    ids=["edited-payload", "edited-time", "removed-event"],
+)
+def test_edited_or_removed_audit_event_breaks_the_chain(environment, tamper):
+    # Bypass the append-only triggers the way direct file access would.
+    with environment.db.transaction() as conn:
+        conn.execute("DROP TRIGGER audit_no_update")
+        conn.execute("DROP TRIGGER audit_no_delete")
+        conn.execute(tamper)
+    with pytest.raises(DomainError) as error:
+        environment.patches.check_integrity()
+    assert error.value.code == ErrorCode.CRITICAL_PERSISTENCE_FAILED
+
+
+def test_schema_v1_store_is_refused_instead_of_silently_upgraded(tmp_path):
+    old = tmp_path / "v1.db"
+    conn = sqlite3.connect(old)
+    conn.execute("PRAGMA user_version=1")
+    conn.close()
+    old.chmod(0o600)
+    with pytest.raises(DomainError) as error:
+        Database(old)
+    assert error.value.code == ErrorCode.SCHEMA_VERSION_UNSUPPORTED
+
+
 def test_audit_rejects_raw_source_and_credentials(environment):
     with pytest.raises(DomainError):
         with environment.db.transaction() as conn:
@@ -217,14 +259,14 @@ def test_verification_persists_result_basis_state_and_replays(environment):
     assert result["state"] == "VERIFIED"
     assert finish(env, patch) == result
     assert len(env.db.rows("SELECT * FROM verification_results")) == 1
-    assert env.patches.check_integrity() == {"revisions_checked": 1}
+    assert env.patches.check_integrity()["revisions_checked"] == 1
     # Reopen a separate connection to the same durable SQLite state.
     path = env.db.rows("PRAGMA database_list")[0][2]
     from pathlib import Path
 
     reopened = Database(Path(path))
     try:
-        assert PatchStore(reopened, env.artifacts).check_integrity() == {"revisions_checked": 1}
+        assert PatchStore(reopened, env.artifacts).check_integrity()["revisions_checked"] == 1
     finally:
         reopened.close()
 
