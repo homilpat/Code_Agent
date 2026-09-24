@@ -5,7 +5,7 @@ from dataclasses import asdict
 from kh_agent.access.gates import VerificationReadiness
 from kh_agent.core.canonical import ContentHash, canonical_bytes, canonical_hash
 from kh_agent.core.clock import utc_now
-from kh_agent.core.enums import Classification, PatchState
+from kh_agent.core.enums import Classification, PatchState, Permission
 from kh_agent.core.errors import DomainError, ErrorCode
 from kh_agent.core.ids import (
     PatchId,
@@ -405,6 +405,147 @@ class PatchStore:
             action,
         )
 
+    def approve_revision(
+        self,
+        patch_id: str,
+        revision: int,
+        user_id: str,
+        *,
+        expected_patch_hash: str,
+        expected_basis_hash: str,
+        target_state_digest: str,
+        key: str,
+    ) -> dict:
+        """Bind an explicit approval to one formally verified, persisted revision.
+
+        The caller must inspect the repository target before supplying its digest.
+        Experimental in-memory candidate tests never produce a VERIFIED revision.
+        """
+        for value in (expected_patch_hash, expected_basis_hash, target_state_digest):
+            try:
+                ContentHash(value, "approval-reference-v1")
+            except ValueError as exc:
+                raise DomainError(ErrorCode.INVALID_INPUT, "Invalid approval reference") from exc
+
+        def require_current_approver(conn, repository_id: str) -> None:
+            actor = conn.execute("SELECT active FROM users WHERE user_id=?", (user_id,)).fetchone()
+            permission = conn.execute(
+                "SELECT 1 FROM permissions WHERE user_id=? AND repository_id=? AND permission=?",
+                (user_id, repository_id, Permission.PATCH_APPROVE.value),
+            ).fetchone()
+            if not actor or not actor["active"] or not permission:
+                raise DomainError(ErrorCode.ACCESS_DENIED)
+
+        # Check before idempotent replay too: a revoked user cannot retrieve an approval.
+        rows = self.db.rows(
+            "SELECT p.repository_id FROM patches p WHERE p.patch_id=?", (patch_id,)
+        )
+        if not rows:
+            raise DomainError(ErrorCode.INVALID_INPUT, "Unknown patch")
+        with self.db.transaction() as conn:
+            require_current_approver(conn, rows[0]["repository_id"])
+
+        def action(conn):
+            row = self._row(conn, patch_id, revision)
+            require_current_approver(conn, row["repository_id"])
+            if row["lifecycle_state"] != PatchState.VERIFIED:
+                raise DomainError(ErrorCode.PATCH_NOT_VERIFIED)
+            if row["patch_hash"] != expected_patch_hash or not row["verification_result_id"]:
+                raise DomainError(ErrorCode.VERIFICATION_BASIS_MISMATCH)
+            result = conn.execute(
+                "SELECT * FROM verification_results WHERE result_id=?",
+                (row["verification_result_id"],),
+            ).fetchone()
+            if (
+                not result
+                or result["outcome"] != PatchState.VERIFIED
+                or result["basis_id"] != row["verification_basis_id"]
+                or result["basis_hash"] != expected_basis_hash
+                or canonical_hash(json.loads(result["basis_json"]), "verification-basis-v1").digest
+                != expected_basis_hash
+            ):
+                raise DomainError(ErrorCode.VERIFICATION_BASIS_MISMATCH)
+            artifact = self._artifact(conn, row["artifact_id"])
+            if hashlib.sha256(self.artifacts.read(artifact)).hexdigest() != expected_patch_hash:
+                raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED)
+            # The basis contains the candidate patch hash and final diff hash.
+            basis = json.loads(result["basis_json"])
+            if (
+                basis["patch_id"] != patch_id
+                or basis["revision"] != revision
+                or basis["patch_hash"] != expected_patch_hash
+                or basis["final_diff_hash"] != row["final_diff_hash"]
+            ):
+                raise DomainError(ErrorCode.VERIFICATION_BASIS_MISMATCH)
+            self._transition(conn, row, PatchState.APPROVED, user_id, "EXPLICIT_APPROVAL")
+            append_event(
+                conn,
+                event_type="PATCH_APPROVED",
+                aggregate_type="patch",
+                aggregate_id=patch_id,
+                repository_id=row["repository_id"],
+                user_id=user_id,
+                payload={
+                    "revision": revision,
+                    "patch_hash": expected_patch_hash,
+                    "basis_hash": expected_basis_hash,
+                    "target_state_digest": target_state_digest,
+                },
+            )
+            return {
+                "state": PatchState.APPROVED.value,
+                "patch_hash": expected_patch_hash,
+                "basis_hash": expected_basis_hash,
+                "target_state_digest": target_state_digest,
+            }
+
+        def replay_guard(conn):
+            row = self._row(conn, patch_id, revision)
+            require_current_approver(conn, row["repository_id"])
+            if row["lifecycle_state"] != PatchState.APPROVED:
+                raise DomainError(ErrorCode.PATCH_NOT_VERIFIED, "Approval is no longer current")
+            result = conn.execute(
+                "SELECT basis_hash FROM verification_results WHERE result_id=?",
+                (row["verification_result_id"],),
+            ).fetchone()
+            if (
+                row["patch_hash"] != expected_patch_hash
+                or not result
+                or result["basis_hash"] != expected_basis_hash
+            ):
+                raise DomainError(ErrorCode.VERIFICATION_BASIS_MISMATCH)
+            events = conn.execute(
+                "SELECT payload_json,user_id FROM audit_events "
+                "WHERE aggregate_type='patch' AND aggregate_id=? AND event_type='PATCH_APPROVED'",
+                (patch_id,),
+            ).fetchall()
+            if not any(
+                event["user_id"] == user_id
+                and json.loads(event["payload_json"]) == {
+                    "revision": revision,
+                    "patch_hash": expected_patch_hash,
+                    "basis_hash": expected_basis_hash,
+                    "target_state_digest": target_state_digest,
+                }
+                for event in events
+            ):
+                raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED)
+
+        return self.db.operation(
+            key,
+            {
+                "action": "approve_revision",
+                "patch_id": patch_id,
+                "revision": revision,
+                "user_id": user_id,
+                "patch_hash": expected_patch_hash,
+                "basis_hash": expected_basis_hash,
+                "target_state_digest": target_state_digest,
+            },
+            action,
+            replay_guard,
+        )
+
     def check_integrity(self) -> dict:
         """Read-only startup reconciliation: corruption never creates authority."""
         with self.db.transaction() as conn:
@@ -413,11 +554,14 @@ class PatchStore:
             for row in rows:
                 state = PatchState.PROPOSED
                 events = conn.execute(
-                    "SELECT event_type,payload_json FROM audit_events "
+                    "SELECT event_type,payload_json,user_id FROM audit_events "
                     "WHERE aggregate_type='patch' AND aggregate_id=? ORDER BY sequence",
                     (row["patch_id"],),
                 ).fetchall()
                 created = 0
+                approval_transitions = 0
+                approvals = []
+                pending_approver = None
                 for event in events:
                     payload = json.loads(event["payload_json"])
                     if payload.get("revision") != row["revision"]:
@@ -431,8 +575,22 @@ class PatchStore:
                             raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED)
                         target = PatchState(payload["to"])
                         require_transition(state, target)
+                        if target == PatchState.APPROVED:
+                            approval_transitions += 1
+                            pending_approver = event["user_id"]
                         state = target
+                    if event["event_type"] == "PATCH_APPROVED":
+                        if state != PatchState.APPROVED or event["user_id"] != pending_approver:
+                            raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED)
+                        try:
+                            ContentHash(payload["target_state_digest"], "target-snapshot-v1")
+                        except (KeyError, ValueError) as exc:
+                            raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED) from exc
+                        approvals.append(payload)
+                        pending_approver = None
                 if created != 1 or state != row["lifecycle_state"]:
+                    raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED)
+                if len(approvals) != approval_transitions:
                     raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED)
                 self.artifacts.read(self._artifact(conn, row["artifact_id"]))
                 if row["verification_result_id"]:
@@ -463,6 +621,12 @@ class PatchStore:
                     if state in (PatchState.VERIFIED, PatchState.APPROVED, PatchState.APPLIED):
                         if result["outcome"] != PatchState.VERIFIED:
                             raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED)
+                    if any(
+                        approval.get("patch_hash") != row["patch_hash"]
+                        or approval.get("basis_hash") != result["basis_hash"]
+                        for approval in approvals
+                    ):
+                        raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED)
                 elif state in (PatchState.VERIFIED, PatchState.APPROVED, PatchState.APPLIED):
                     raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED)
         return {"revisions_checked": len(rows), "audit_events_checked": audit_events}

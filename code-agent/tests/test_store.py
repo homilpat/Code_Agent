@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from kh_agent.access.gates import VerificationReadiness
-from kh_agent.core.enums import CheckStatus, Classification, PatchState
+from kh_agent.core.enums import CheckStatus, Classification, PatchState, Permission
 from kh_agent.core.errors import DomainError, ErrorCode
 from kh_agent.core.ids import RepositoryId
 from kh_agent.core.lifecycle import CheckResult
@@ -152,6 +152,27 @@ def test_edited_or_removed_audit_event_breaks_the_chain(environment, tamper):
     assert error.value.code == ErrorCode.CRITICAL_PERSISTENCE_FAILED
 
 
+def test_reopening_a_store_refuses_a_tampered_audit_chain(tmp_path):
+    path = tmp_path / "audit.db"
+    db = Database(path)
+    with db.transaction() as conn:
+        append_event(
+            conn,
+            event_type="REQUEST_RECEIVED",
+            aggregate_type="request",
+            aggregate_id="request",
+            repository_id=None,
+            user_id=None,
+            payload={"reason_code": "original"},
+        )
+        conn.execute("DROP TRIGGER audit_no_update")
+        conn.execute("UPDATE audit_events SET event_type='FORGED' WHERE sequence=1")
+    db.close()
+    with pytest.raises(DomainError) as error:
+        Database(path)
+    assert error.value.code == ErrorCode.CRITICAL_PERSISTENCE_FAILED
+
+
 def test_schema_v1_store_is_refused_instead_of_silently_upgraded(tmp_path):
     old = tmp_path / "v1.db"
     conn = sqlite3.connect(old)
@@ -269,6 +290,97 @@ def test_verification_persists_result_basis_state_and_replays(environment):
         assert PatchStore(reopened, env.artifacts).check_integrity()["revisions_checked"] == 1
     finally:
         reopened.close()
+
+
+def test_formal_revision_approval_binds_candidate_basis_target_and_actor(environment):
+    env = environment
+    patch = verifying(env)
+    finish(env, patch)
+    row = env.db.rows("SELECT patch_hash,verification_result_id FROM patch_revisions")[0]
+    basis = env.db.rows(
+        "SELECT basis_hash FROM verification_results WHERE result_id=?",
+        (row["verification_result_id"],),
+    )[0]["basis_hash"]
+    args = {
+        "expected_patch_hash": row["patch_hash"],
+        "expected_basis_hash": basis,
+        "target_state_digest": "e" * 64,
+        "key": "approve",
+    }
+    approved = env.patches.approve_revision(patch["patch_id"], 1, env.actor.user_id, **args)
+    assert approved == {"state": "APPROVED", "patch_hash": row["patch_hash"],
+                        "basis_hash": basis, "target_state_digest": "e" * 64}
+    assert env.patches.approve_revision(patch["patch_id"], 1, env.actor.user_id, **args) == approved
+    assert env.patches.check_integrity()["revisions_checked"] == 1
+    event = env.db.rows("SELECT payload_json,user_id FROM audit_events "
+                        "WHERE event_type='PATCH_APPROVED'")[0]
+    assert json.loads(event["payload_json"])["target_state_digest"] == "e" * 64
+    assert event["user_id"] == env.actor.user_id
+    with env.db.transaction() as conn:
+        current = env.patches._row(conn, patch["patch_id"], 1)
+        env.patches._transition(
+            conn, current, PatchState.STALE_VERIFICATION, env.actor.user_id, "BASE_CHANGED"
+        )
+    with pytest.raises(DomainError) as stale:
+        env.patches.approve_revision(patch["patch_id"], 1, env.actor.user_id, **args)
+    assert stale.value.code == ErrorCode.PATCH_NOT_VERIFIED
+
+
+def test_approval_refuses_preview_or_wrong_basis_and_revoked_actor(environment):
+    env = environment
+    patch = proposal(env)
+    row = env.db.rows("SELECT patch_hash FROM patch_revisions")[0]
+    args = {"expected_patch_hash": row["patch_hash"],
+            "expected_basis_hash": "a" * 64, "target_state_digest": "e" * 64}
+    with pytest.raises(DomainError) as unverified:
+        env.patches.approve_revision(patch["patch_id"], 1, env.actor.user_id, key="no", **args)
+    assert unverified.value.code == ErrorCode.PATCH_NOT_VERIFIED
+    env.patches.record_worktree_result(
+        patch["patch_id"], 1, env.actor.user_id, succeeded=True, key="worktree"
+    )
+    env.patches.begin_verification(
+        patch["patch_id"], 1, env.actor.user_id,
+        readiness=VerificationReadiness(PatchState.APPLIED_TO_WORKTREE, True,
+                                        "ALLOW", "risk", "plan"),
+        final_diff_hash="c" * 64, plan={"test": True, "optional": False}, key="begin",
+    )
+    finish(env, patch)
+    with pytest.raises(DomainError) as mismatched:
+        env.patches.approve_revision(patch["patch_id"], 1, env.actor.user_id, key="bad", **args)
+    assert mismatched.value.code == ErrorCode.VERIFICATION_BASIS_MISMATCH
+    env.registry.permission(
+        env.actor, env.actor.user_id, env.repository_id, Permission.PATCH_APPROVE, grant=False
+    )
+    with pytest.raises(DomainError) as revoked:
+        env.patches.approve_revision(patch["patch_id"], 1, env.actor.user_id, key="bad", **args)
+    assert revoked.value.code == ErrorCode.ACCESS_DENIED
+    assert env.db.rows("SELECT * FROM audit_events WHERE event_type='PATCH_APPROVED'") == []
+
+
+def test_approval_event_failure_cannot_publish_approved_state(environment):
+    env = environment
+    patch = verifying(env)
+    finish(env, patch)
+    row = env.db.rows("SELECT patch_hash,verification_result_id FROM patch_revisions")[0]
+    basis = env.db.rows(
+        "SELECT basis_hash FROM verification_results WHERE result_id=?",
+        (row["verification_result_id"],),
+    )[0]["basis_hash"]
+    with env.db.transaction() as conn:
+        conn.execute(
+            "CREATE TRIGGER fail_approval BEFORE INSERT ON audit_events "
+            "WHEN NEW.event_type='PATCH_APPROVED' BEGIN "
+            "SELECT RAISE(ABORT, 'failure'); END"
+        )
+    with pytest.raises(DomainError) as error:
+        env.patches.approve_revision(
+            patch["patch_id"], 1, env.actor.user_id,
+            expected_patch_hash=row["patch_hash"], expected_basis_hash=basis,
+            target_state_digest="e" * 64, key="approve-error",
+        )
+    assert error.value.code == ErrorCode.CRITICAL_PERSISTENCE_FAILED
+    assert env.db.rows("SELECT lifecycle_state FROM patch_revisions")[0][0] == "VERIFIED"
+    assert not env.db.rows("SELECT * FROM operations WHERE idempotency_key='approve-error'")
 
 
 def test_result_write_failure_does_not_publish_verified(environment):

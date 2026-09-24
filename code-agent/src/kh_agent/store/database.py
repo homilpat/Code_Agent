@@ -57,6 +57,9 @@ class Database:
                 schema = files("kh_agent.store").joinpath("schema.sql").read_text("utf-8")
                 # executescript otherwise commits implicitly: include the transaction itself.
                 self.connection.executescript("BEGIN IMMEDIATE;\n" + schema + "\nCOMMIT;")
+            else:
+                # Refuse a previously modified chain before exposing stored authority.
+                verify_audit_chain(self.connection)
         except (sqlite3.Error, DomainError) as exc:
             self.connection.close()
             if isinstance(exc, DomainError):
@@ -85,6 +88,7 @@ class Database:
         key: str,
         request: dict[str, Any],
         action: Callable[[sqlite3.Connection], dict[str, Any]],
+        replay_guard: Callable[[sqlite3.Connection], None] | None = None,
     ) -> dict[str, Any]:
         if not key or len(key) > 200:
             raise DomainError(ErrorCode.INVALID_INPUT, "Idempotency key required")
@@ -96,6 +100,8 @@ class Database:
             if existing:
                 if existing["fingerprint"] != fingerprint:
                     raise DomainError(ErrorCode.IDEMPOTENCY_CONFLICT)
+                if replay_guard is not None:
+                    replay_guard(conn)
                 return json.loads(existing["result_json"])
             result = action(conn)
             conn.execute(
@@ -137,6 +143,14 @@ AUDIT_FIELDS = frozenset(
         "target_user_id",
         "request_type",
         "check_point",
+        "target_state_digest",
+        "attempt_id",
+        "path_hash",
+        "before_sha256",
+        "after_sha256",
+        "candidate_hash",
+        "test_plan_hash",
+        "test_attestation_digest",
     }
 )
 
