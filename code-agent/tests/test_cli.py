@@ -1,5 +1,6 @@
 import json
 import sys
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -52,3 +53,118 @@ def test_local_cli_registration_status_and_history(environment, monkeypatch, tmp
 def test_apply_has_no_auto_approve_switch():
     result = runner.invoke(app, ["apply", "--yes"])
     assert result.exit_code != 0
+
+
+def test_modify_routes_targeted_request_to_local_preview(monkeypatch, tmp_path):
+    seen = {}
+
+    def preview(path, target, request, model, port):
+        seen.update(path=path, target=target, request=request, model=model, port=port)
+        return {"status": "MODEL_PREVIEW_ONLY"}
+
+    monkeypatch.setattr("kh_agent.cli.app.require_linux_store", lambda root: root)
+    monkeypatch.setattr(
+        "kh_agent.cli.app.Database", lambda path: SimpleNamespace(close=lambda: None)
+    )
+    monkeypatch.setattr(
+        "kh_agent.cli.app._application",
+        lambda ctx, db: SimpleNamespace(generate_preview=preview),
+    )
+    result = runner.invoke(
+        app,
+        [
+            "--store",
+            str(tmp_path),
+            "modify",
+            "Fix the value",
+            "--target",
+            "app.py",
+            "--model",
+            "local/model",
+            "--port",
+            "1234",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert seen["target"] == "app.py" and seen["model"] == "local/model"
+    assert seen["request"] == "Fix the value" and seen["port"] == 1234
+
+
+def test_modify_routes_generated_candidate_to_test_and_requires_both_options(
+    monkeypatch, tmp_path
+):
+    seen = {}
+
+    def generate_and_verify(path, target, request, model, image, tests, port):
+        seen.update(
+            target=target, request=request, model=model, image=image, tests=tests, port=port
+        )
+        return {"status": "MODEL_TEST_EXPERIMENTAL", "apply_ready": False}
+
+    monkeypatch.setattr("kh_agent.cli.app.require_linux_store", lambda root: root)
+    monkeypatch.setattr(
+        "kh_agent.cli.app.Database", lambda path: SimpleNamespace(close=lambda: None)
+    )
+    monkeypatch.setattr(
+        "kh_agent.cli.app._application",
+        lambda ctx, db: SimpleNamespace(generate_and_verify=generate_and_verify),
+    )
+    args = ["modify", "Fix the value", "--target", "app.py", "--model", "local/model"]
+    image = "a" * 64
+    result = runner.invoke(app, [*args, "--image", image, "--test", "tests/test_app.py"])
+    assert result.exit_code == 0, result.output
+    assert seen == {
+        "target": "app.py", "request": "Fix the value", "model": "local/model",
+        "image": image, "tests": ("tests/test_app.py",), "port": 1234,
+    }
+    assert json.loads(result.stdout)["apply_ready"] is False
+    for incomplete in (["--image", image], ["--test", "tests/test_app.py"]):
+        rejected = runner.invoke(app, [*args, *incomplete])
+        assert rejected.exit_code != 0
+        assert "must be supplied together" in rejected.output
+
+
+def test_apply_candidate_routes_reviewed_digest_to_experimental_apply(monkeypatch, tmp_path):
+    seen = {}
+
+    def apply_tested_candidate(path, candidate_file, reviewed_hash,
+                               reviewed_source_hash, reviewed_target_digest, image, tests):
+        seen.update(candidate_file=candidate_file, reviewed_hash=reviewed_hash,
+                    reviewed_source_hash=reviewed_source_hash,
+                    reviewed_target_digest=reviewed_target_digest,
+                    image=image, tests=tests)
+        return {"status": "EXPERIMENTAL_APPLIED"}
+
+    monkeypatch.setattr("kh_agent.cli.app.require_linux_store", lambda root: root)
+    monkeypatch.setattr("kh_agent.cli.app.Database",
+                        lambda path: SimpleNamespace(close=lambda: None))
+    monkeypatch.setattr("kh_agent.cli.app._application",
+                        lambda ctx, db: SimpleNamespace(
+                            apply_tested_candidate=apply_tested_candidate))
+    result = runner.invoke(app, [
+        "apply-candidate", str(tmp_path / "candidate.json"),
+        "--reviewed-hash", "a" * 64, "--image", "b" * 64,
+        "--reviewed-source-hash", "c" * 64, "--reviewed-target-digest", "d" * 64,
+        "--test", "tests/test_app.py",
+    ])
+    assert result.exit_code == 0, result.output
+    assert seen["reviewed_hash"] == "a" * 64
+    assert seen["reviewed_target_digest"] == "d" * 64
+    assert seen["tests"] == ("tests/test_app.py",)
+
+
+def test_reconcile_write_cli_routes_attempt_and_path(monkeypatch, tmp_path):
+    seen = {}
+
+    def reconcile_write(path, attempt_id, target):
+        seen.update(path=path, attempt_id=attempt_id, target=target)
+        return {"status": "WRITE_RECONCILED", "observed": "ORIGINAL_BYTES"}
+
+    monkeypatch.setattr("kh_agent.cli.app.require_linux_store", lambda root: root)
+    monkeypatch.setattr("kh_agent.cli.app.Database",
+                        lambda path: SimpleNamespace(close=lambda: None))
+    monkeypatch.setattr("kh_agent.cli.app._application",
+                        lambda ctx, db: SimpleNamespace(reconcile_write=reconcile_write))
+    result = runner.invoke(app, ["reconcile-write", "cmd_" + "a" * 32, "app.py"])
+    assert result.exit_code == 0, result.output
+    assert seen["target"] == "app.py" and seen["attempt_id"].startswith("cmd_")

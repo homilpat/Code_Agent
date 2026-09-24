@@ -192,7 +192,7 @@ RepoOption = Annotated[Path, typer.Option("--repo", help="Repository path, defau
 
 @app.command()
 def status(ctx: typer.Context, repo: RepoOption = Path(".")) -> None:
-    """Read authorized Git administrative metadata; source/dirty/graph are not yet available."""
+    """Read authorized Safe Git HEAD, index and worktree status."""
     _run(ctx, lambda db: _application(ctx, db).execute("status", repo))
 
 
@@ -219,9 +219,93 @@ def impact(ctx: typer.Context, target: str, repo: RepoOption = Path(".")) -> Non
 
 
 @app.command()
-def modify(ctx: typer.Context, request: str, repo: RepoOption = Path(".")) -> None:
-    """Reserved; candidate generation and worktree mutation are not enabled yet."""
-    _pending(ctx, "modify", repo)
+def modify(
+    ctx: typer.Context,
+    request: str,
+    repo: RepoOption = Path("."),
+    target: Annotated[str | None, typer.Option(help="One Python source path.")] = None,
+    model: Annotated[str | None, typer.Option(help="Loaded local model identifier.")] = None,
+    port: Annotated[int, typer.Option(min=1, max=65535)] = 1234,
+    image: Annotated[str | None, typer.Option(help="Prebuilt immutable Podman image ID.")] = None,
+    test: Annotated[list[str] | None, typer.Option(help="Registered pytest path.")] = None,
+) -> None:
+    """Generate a local candidate; optionally test it in rootless Podman."""
+    if (image is None) != (not test):
+        raise typer.BadParameter("--image and at least one --test must be supplied together")
+    if target is None or model is None:
+        _pending(ctx, "modify", repo)
+        return
+    if image is not None:
+        _run(
+            ctx,
+            lambda db: _application(ctx, db).generate_and_verify(
+                repo, target, request, model, image, tuple(test or ()), port
+            ),
+        )
+        return
+    _run(ctx, lambda db: _application(ctx, db).generate_preview(repo, target, request, model, port))
+
+
+@app.command("preview-candidate")
+def preview_candidate_command(
+    ctx: typer.Context, candidate_file: Path, repo: RepoOption = Path(".")
+) -> None:
+    """Show one supplied Python file replacement without writing to the repository."""
+    _run(ctx, lambda db: _application(ctx, db).preview(repo, candidate_file))
+
+
+@app.command("verify-candidate")
+def verify_candidate_command(
+    ctx: typer.Context,
+    candidate_file: Path,
+    image: Annotated[str, typer.Option("--image", help="Prebuilt immutable Podman image ID.")],
+    test: Annotated[list[str], typer.Option("--test", help="Registered pytest path.")],
+    repo: RepoOption = Path("."),
+) -> None:
+    """Run pytest on a candidate in rootless Podman; never approve or apply it."""
+    _run(
+        ctx,
+        lambda db: _application(ctx, db).verify_candidate(repo, candidate_file, image, tuple(test)),
+    )
+
+
+@app.command("apply-candidate")
+def apply_candidate_command(
+    ctx: typer.Context,
+    candidate_file: Path,
+    reviewed_hash: Annotated[
+        str, typer.Option("--reviewed-hash", help="Candidate hash shown by preview-candidate.")
+    ],
+    reviewed_source_hash: Annotated[
+        str, typer.Option("--reviewed-source-hash", help="Source hash shown by preview-candidate.")
+    ],
+    reviewed_target_digest: Annotated[
+        str,
+        typer.Option("--reviewed-target-digest", help="Target digest shown by preview-candidate."),
+    ],
+    image: Annotated[str, typer.Option("--image", help="Prebuilt immutable Podman image ID.")],
+    test: Annotated[list[str], typer.Option("--test", help="Registered pytest path.")],
+    repo: RepoOption = Path("."),
+) -> None:
+    """Explicit experimental one-file apply after a fresh isolated pytest run."""
+    _run(
+        ctx,
+        lambda db: _application(ctx, db).apply_tested_candidate(
+            repo, candidate_file, reviewed_hash, reviewed_source_hash,
+            reviewed_target_digest, image, tuple(test)
+        ),
+    )
+
+
+@app.command("reconcile-write")
+def reconcile_write_command(
+    ctx: typer.Context,
+    attempt_id: str,
+    target: str,
+    repo: RepoOption = Path("."),
+) -> None:
+    """Observe an interrupted single-file write; do not retry or approve it."""
+    _run(ctx, lambda db: _application(ctx, db).reconcile_write(repo, attempt_id, target))
 
 
 @app.command()

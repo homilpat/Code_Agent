@@ -1,6 +1,24 @@
 # Code Agent 구현 진행 기록
 
-기준일: 2026-09-15 (Asia/Seoul), 마지막 코드 검증: 2026-09-15
+기준일: 2026-09-24 (UTC), 마지막 코드 검증: 2026-09-24
+
+## 2026-09-24: Safe Git ignored source와 재검사 게이트
+
+- 후속 적용 준비: `patch/file_writer.py`에 기존 Python 파일 1개의 descriptor-relative 교체 구성요소를 추가했다. 기존 소스 바이트/해시·regular file/하드링크/심볼릭 링크·부모 경로·root identity를 확인하고 trusted caller의 재검사 callback 다음에 같은 디렉터리 임시 파일을 fsync하여 rename한다. 실제 Git 저장소 테스트에서 성공·중간 변경·링크 거부를 확인했다. 전역 동시 쓰기의 원자적 차단, 파일 변경과 감사 이벤트의 crash-consistent 연결, 정식 COMPLETE 스냅샷/검증/승인 연결은 여전히 없으므로 CLI apply는 차단된다.
+- 정식 승인 기록 1차: `PatchStore.approve_revision`은 영속 `VERIFIED` revision과 검증 basis/patch artifact를 재확인하고, 현재 `PATCH_APPROVE` 권한과 예상 patch/basis/target digest를 대조해 `APPROVED` 전이와 `PATCH_APPROVED` 해시 체인 이벤트를 같은 SQLite 트랜잭션에 기록한다. 재시도 시 권한과 현재 승인 상태를 다시 검사하며, 재시작 integrity 검사에서 승인 이벤트와 전이를 대조한다. 임시 모델 테스트(`MODEL_TEST_EXPERIMENTAL`)는 정식 VERIFIED revision이 아니므로 이 경로에 들어갈 수 없다. CLI 적용 및 변경/감사 사이 장애 복구는 미연결.
+- 작업 파일 교체 journal 1차: `WorktreeWriteJournal`은 파일 교체 전 `WORKTREE_WRITE_PREPARED`를 별도 트랜잭션으로 영속화하고 성공 시 `WORKTREE_WRITE_FINISHED`를 남긴다. 중간 검사 실패·완료 기록 실패가 나면 pending을 유지해 같은 저장소의 다음 journaled write를 막는다. 상태 조회에서도 pending 수와 `mutation_ready=false`를 노출한다. DB 재시작 후 pending을 재구성하고, 권한 있는 담당자가 원본/교체본 파일 바이트를 다시 읽어 일치할 때만 `WORKTREE_WRITE_RECONCILED`를 남기는 내부 복구 API와 회귀 테스트가 있다. 관찰은 과거 승인·정식 검증을 증명하지 않는다. 운영 복구 명령은 아직 없으므로 이 API는 내부 실험용이며 CLI `apply`에는 연결하지 않았다.
+- `kh apply-candidate`: 미리보기의 candidate/source/target 해시를 명시적 검토 근거로 받는다. 네 권한 경로(modify/explain/verify/apply)를 소스 읽기 전에 검사하고 격리 pytest를 재실행해 PASS/exit0/정상 종료일 때만 적용한다. 후보 및 테스트 증명 digest를 prewrite journal에 포함하고, 최신 Git·source·권한을 비교한 뒤 기존 Python 파일 한 개를 교체한다. postwrite 검사 실패 시 journal pending이 남는다. `status`에 표시된 attempt ID와 경로를 `kh reconcile-write`에 넘기면 실제 파일 바이트를 재검사해 원본/교체본 관찰을 감사 체인에 남긴다. 결과는 EXPERIMENTAL_APPLIED/formal_verification=false. 실제 Podman 이미지는 이번 환경에 없어 mock sandbox + 실제 Git fixture만 검증했으며, 정식 `kh apply` 수명주기와 COMPLETE source proof는 별도로 남는다.
+- 후속 보완: v2 ingestion 정책에서 `.pyc`, `.pyo`, `.log`를 생성 파일로 제외하고 source scanner와 Safe Git untracked 검사에 같은 분류를 사용한다. 그 밖의 ignored 파일은 계속 검사한다.
+- TargetSnapshot digest에 ingestion policy content hash를 포함해 같은 버전명으로 scope가 바뀌어도 기존 기준을 재사용하지 못하게 한다.
+- `kh preview-candidate`: 저장소 밖 JSON으로 받은 한 Python 파일 수정 후보를 source snapshot에서 읽어 diff만 반환한다. CODE_ANALYZE·CHANGE_PROPOSE를 모두 확인하고 source·target을 재검사한다. 결과는 PARTIAL/PREVIEW_ONLY이고 patch authority, 모델 생성, 테스트, 적용은 아니다.
+- `kh verify-candidate`: 같은 수동 후보를 메모리에서만 Python source view로 치환한 뒤 rootless Podman pytest backend에 넘긴다. 세 권한(CHANGE_PROPOSE/CODE_ANALYZE/PATCH_VERIFY), source/target 전후 재검사, immutable image ID 및 고정 테스트 경로가 필요하다. 결과는 EXPERIMENTAL_TEST_ONLY이며 정식 verification basis나 apply authority는 없다. 실제 Podman 통합 실행은 이번 환경에서 미확인이다.
+- `kh modify --target --model`: 한 Python 파일과 요청만 127.0.0.1의 OpenAI 호환 서버에 보내 수동 후보와 동일한 read-only preview 경계를 통과시킨다. 응답·경로·크기 제한, ACL/source/target 재검사, MODEL_PREVIEW_ONLY/apply_ready=false. 검사를 통과한 candidate JSON을 결과에 포함해 별도 저장 후 verify-candidate에 다시 입력할 수 있다. loopback HTTP 프로토콜은 모의 서버로 확인했지만 실제 LM Studio 모델의 출력 품질은 이번 환경에서 미확인이다. 자동 연결·durable workflow도 아직 없다.
+- `kh modify --target --model --image --test`: 모델 생성 결과를 같은 호출에서 임시 source view로 만들어 Podman pytest에 전달한다. 생성 전에 세 권한을 확인하고 생성 후·테스트 후 source/target/권한을 재검사한다. 후보·diff·테스트 결과를 MODEL_TEST_EXPERIMENTAL/apply_ready=false로 반환하며 파일을 적용하거나 정식 검증으로 승격하지 않는다. 이번 환경에서는 모의 모델·sandbox 경계만 검증했고 실제 Podman 실행은 확인하지 못했다.
+- `ls-files --others`로 Git ignore 규칙과 무관하게 정책상 관련 untracked 파일을 검사한다. source scanner가 포함할 수 있는 ignored 파일을 mutation-ready에서 숨기지 않는다. 기존 민감 경로와 제외 디렉터리 필터는 유지한다.
+- `Application`의 변경 명령은 두 target inspection의 digest가 같아야 다음 단계로 진행한다. `revalidate_target(expected, ...)`는 미래 apply가 바인딩된 기준을 적용 직전에 재검사할 수 있는 내부 API다.
+- 테스트: ignored 디렉터리·파일, 제외 디렉터리, 기준 후 변경, 두 검사 사이 변경. 여러 시점의 완전한 원자성이나 ABA 변경 탐지는 아직 증명하지 않는다. 실제 `apply`는 계속 비활성화돼 있다.
+- `code-agent/README.md`의 Safe Git, Podman, LSP 구현 상태를 현재 CLI 연결 범위에 맞게 갱신했다.
+- 기존 DB 재시작 시 감사 해시 체인을 검사하고 손상된 기록을 거부한다. 끝부분 삭제 및 DB 전체 교체를 검출할 외부 체크포인트와 실행 중 재검사는 아직 없다.
 
 ## 2026-09-15: sandbox 안의 Python LSP 클라이언트 (L1)
 
