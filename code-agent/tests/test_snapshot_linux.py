@@ -109,3 +109,16 @@ def test_policy_excluded_build_output_does_not_change_source_scope(environment):
     after = scan(repo)
     assert [file.path for file in after.files] == [file.path for file in before.files]
     assert {"path": encode_path(b"build"), "reason": "POLICY_EXCLUDED"} in after.exclusions
+
+
+def test_generated_files_are_excluded_from_source_view(environment):
+    repo = environment.repo
+    (repo / "app.py").write_text("VALUE = 1\n")
+    (repo / "app.pyc").write_bytes(b"bytecode")
+    (repo / "runtime.log").write_text("local output\n")
+    result = scan(repo)
+    assert [file.path for file in result.files] == [b"app.py"]
+    assert {item["path"] for item in result.exclusions if item["reason"] == "GENERATED_FILE"} == {
+        encode_path(b"app.pyc"),
+        encode_path(b"runtime.log"),
+    }

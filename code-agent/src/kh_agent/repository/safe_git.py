@@ -22,7 +22,7 @@ from kh_agent.core.clock import utc_now
 from kh_agent.core.errors import DomainError, ErrorCode
 from kh_agent.repository.identity import RepositoryIdentity
 from kh_agent.repository.metadata import MetadataInspector
-from kh_agent.security.ingestion import IngestionPolicy, sensitive_path
+from kh_agent.security.ingestion import IngestionPolicy, generated_file, sensitive_path
 from kh_agent.security.linux_fs import open_no_alias
 
 SAFE_PATH = "/usr/local/bin:/usr/bin:/bin"
@@ -359,7 +359,9 @@ class SafeGitInspector:
         return records, uncertain
 
     def _untracked(self, object_format: str) -> list[dict]:
-        _, raw = self._git("ls-files", "-z", "--others", "--exclude-standard")
+        # Git's ignore rules are not ingestion authority. The source scanner also sees
+        # ignored files, so omitting them here could certify a different tree as clean.
+        _, raw = self._git("ls-files", "-z", "--others")
         records = []
         root = os.fsencode(self.identity.canonical_root)
         root_fd = open_no_alias(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
@@ -370,6 +372,7 @@ class SafeGitInspector:
                     path.endswith(b"/")  # a nested repository boundary, not a source file
                     or any(part in self.policy.excluded_directories for part in parts)
                     or any(sensitive_path(part) for part in parts)
+                    or generated_file(parts[-1])
                 ):
                     continue
                 kind, mode, oid = self._worktree_object(root_fd, path, object_format)
@@ -438,6 +441,7 @@ class SafeGitInspector:
             "object_state": objects,
             "worktree": worktree,
             "ingestion_policy_version": self.policy.version,
+            "ingestion_policy_hash": self.policy.fingerprint(),
         }
         identity = {
             "canonical_root": self.identity.canonical_root,
@@ -464,3 +468,27 @@ def inspect_target(
     identity: RepositoryIdentity, repository_id: str, policy: IngestionPolicy | None = None
 ) -> TargetSnapshot:
     return SafeGitInspector(identity, repository_id, policy).snapshot()
+
+
+def revalidate_target(
+    expected: TargetSnapshot,
+    identity: RepositoryIdentity,
+    repository_id: str,
+    policy: IngestionPolicy | None = None,
+) -> TargetSnapshot:
+    """Reinspect immediately before a mutation; reject a stale or unsafe target.
+
+    This detects changes between inspections, not an atomic Git/worktree snapshot.
+    A future apply operation must bind its base to ``expected`` and call this gate
+    immediately before the side effect.
+    """
+    from kh_agent.access.gates import require_mutation_target
+
+    if expected.target_id != repository_id or expected.target_type != "GIT_WORKTREE":
+        raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED, "Target identity changed")
+    require_mutation_target(expected)
+    current = inspect_target(identity, repository_id, policy)
+    require_mutation_target(current)
+    if current.state_digest != expected.state_digest:
+        raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED, "Target changed after inspection")
+    return current

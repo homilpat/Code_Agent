@@ -9,7 +9,12 @@ from pathlib import Path
 from kh_agent.core.canonical import canonical_hash, encode_path
 from kh_agent.core.errors import DomainError, ErrorCode
 from kh_agent.repository.identity import RepositoryIdentity
-from kh_agent.security.ingestion import IngestionPolicy, sensitive_content, sensitive_path
+from kh_agent.security.ingestion import (
+    IngestionPolicy,
+    generated_file,
+    sensitive_content,
+    sensitive_path,
+)
 from kh_agent.security.linux_fs import open_no_alias
 
 
@@ -142,6 +147,9 @@ class SourceScanner:
                                 excluded(relative, "NESTED_REPOSITORY")
                         finally:
                             os.close(child_fd)
+                        continue
+                    if generated_file(decoded):
+                        excluded(relative, "GENERATED_FILE")
                         continue
                     if not stat.S_ISREG(entry_info.st_mode) or entry_info.st_nlink != 1:
                         excluded(relative, "SPECIAL_FILE_OR_HARDLINK")

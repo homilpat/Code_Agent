@@ -7,7 +7,7 @@ from kh_agent.core.canonical import canonical_hash
 
 @dataclass(frozen=True)
 class IngestionPolicy:
-    version: str = "ingestion-v1"
+    version: str = "ingestion-v2"
     excluded_directories: frozenset[str] = frozenset(
         {
             ".git",
@@ -78,6 +78,12 @@ def sensitive_path(name: str) -> bool:
         }
         or lower.endswith((".pem", ".key", ".p12", ".pfx", ".keystore"))
     )
+
+
+def generated_file(name: str) -> bool:
+    """Known local outputs are not part of the source view or mutation-safety scope."""
+    lower = name.casefold()
+    return lower.endswith((".pyc", ".pyo", ".log"))
 
 
 _SECRET_PATTERNS = (
