@@ -1,4 +1,5 @@
 import hashlib
+import os
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,8 @@ def image_id():
 
 
 IMAGE = image_id()
+if os.environ.get("KH_REQUIRE_SANDBOX_TESTS") == "1" and IMAGE is None:
+    pytest.fail("Required rootless Podman pytest image is unavailable", pytrace=False)
 pytestmark = pytest.mark.skipif(
     IMAGE is None, reason="needs Linux rootless podman and the kh-python-pytest image"
 )

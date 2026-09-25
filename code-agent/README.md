@@ -104,7 +104,7 @@ Risk evidence provider가 아직 연결되지 않은 요소는 `UNAVAILABLE`입�
 - 민감 데이터는 경로 검사 후 읽고 다시 콘텐츠 검사합니다. 내장 detector가 모든 secret을 찾아낸다고 보장하지 않습니다. 발견된 파일은 AST·일반 graph persistence 대상에서 제외합니다.
 - FileArtifacts는 Linux 전용입니다. 암호화 키 저장소가 없으므로 SENSITIVE/PROTECTED artifact는 저장을 차단합니다. Orphan을 자동 삭제하지 않고 조회합니다.
 - 기존 DB를 열 때 audit hash chain을 확인합니다. 프로세스 실행 중 모든 조회에서 재검사하지는 않으며, 마지막 이벤트 삭제나 전체 DB 교체는 DB 밖의 보호된 체크포인트 없이는 확인할 수 없습니다.
-- 내부 Podman backend는 rootless/cgroup v2/seccomp를 확인하고 runtime-safe source view에서 등록된 pytest 명령과 pyright 서버를 실행합니다. 이미지가 사전 빌드되지 않은 환경에서는 통합 테스트가 skip됩니다. CLI의 `verify`와 `explain`/`impact` LSP 연결은 아직 제공하지 않습니다.
+- 내부 Podman backend는 rootless/cgroup v2/seccomp를 확인하고 runtime-safe source view에서 등록된 pytest 명령과 pyright 서버를 실행합니다. 로컬에 이미지가 없으면 통합 테스트가 skip됩니다. `.github/workflows/code-agent-sandbox.yml`은 Linux CI에서 두 이미지를 먼저 빌드하고 rootless/cgroup v2를 확인한 뒤 통합 테스트를 실행합니다. 이미지 준비 또는 실행 실패는 CI 실패이며 skip을 정상 검증으로 보지 않습니다. 이 workflow의 실제 GitHub 실행 결과는 별도로 확인해야 합니다. CLI의 `verify`와 `explain`/`impact` LSP 연결은 아직 제공하지 않습니다.
 - `PatchStore.finish_verification` 테스트는 trusted 입력에 대한 **저장 일관성** 검증입니다. 실제 repository test/sandbox/approval/apply 성공을 뜻하지 않습니다.
 
 ## 파일 위치
