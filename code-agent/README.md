@@ -15,6 +15,8 @@ uv run kh repo register /home/user/projects/example
 uv run kh status --repo /home/user/projects/example
 uv run kh explain src/example.py --repo /home/user/projects/example
 uv run kh impact src/example.py --repo /home/user/projects/example
+# pyright 이미지가 준비됐으면, 1부터 세는 행·UTF-16 열에서 정의·참조·진단을 조회
+uv run kh semantic src/example.py --line 5 --column 10 --image "$PYRIGHT_IMAGE_ID" --repo /home/user/projects/example
 uv run kh history --repo /home/user/projects/example
 # 별도 파일에 작성한 JSON 수정 후보의 diff만 확인 (저장소에 쓰지 않음)
 uv run kh preview-candidate /home/user/candidate.json --repo /home/user/projects/example
@@ -59,7 +61,7 @@ Windows 개발 환경:
 | Patch 저장 | proposal/revision, 검증 plan/result/basis의 원자적 저장, VERIFIED revision 전용 내부 승인 기록, artifact integrity, 재시작 audit/state 확인 |
 | Risk domain | versioned weighted integer scoring, missing evidence interval, 보수적 상한 기반 level, preliminary/final 구분 |
 | Command policy | 제한된 pytest targets, 고정 argv/env, image digest 기반 Podman 실행 backend. `verify-candidate`, `modify --image --test`, `apply-candidate`의 실험적 후보 테스트에 연결 |
-| Python LSP | 격리된 pyright 서버와 통신하는 bounded client(내부 API). explain/impact에는 미연결 |
+| Python LSP | `semantic`에서 격리된 pyright 서버로 한 위치의 정의·참조와 해당 파일 진단 조회. explain/impact의 기존 AST 결과와 자동 통합하지 않음 |
 | 로컬 모델 후보 | loopback OpenAI 호환 서버에 한 Python 파일과 요청을 보내고, 단일 파일 수정 후보의 diff를 제공. 선택적으로 해당 후보를 임시 source view에서 Podman pytest 실행 |
 | YAML 정책 | bounded SafeLoader, tag/anchor/alias/duplicate/unknown field 거부, owner-private 외부 store에서 로드 |
 
@@ -70,6 +72,8 @@ Windows 개발 환경:
 `preview-candidate`는 저장소 밖에 있는 JSON 파일의 `{"operations":[{"path":"app.py","operation":"modify","content":"...전체 새 파일 내용..."}]}` 형식을 받습니다. 현재 한 Python 파일만 지원합니다. `CHANGE_PROPOSE`와 `CODE_ANALYZE` 권한을 확인하고 안전한 source view에서 diff를 계산합니다. AI가 내용을 생성하거나 테스트·저장·적용하지 않으며, 반환되는 PARTIAL snapshot hash는 승인/적용 권한이 아닙니다.
 
 `verify-candidate`는 같은 수동 후보의 임시 Python source view에서 등록된 pytest 경로를 rootless Podman으로 실행합니다. `CHANGE_PROPOSE`, `CODE_ANALYZE`, `PATCH_VERIFY` 권한이 필요하며 이미지 ID는 미리 빌드된 immutable digest여야 합니다. 결과는 `EXPERIMENTAL_TEST_ONLY`/`apply_ready=false`입니다. source snapshot이 PARTIAL인 상태이므로 pytest PASS도 정식 Patch Verification·승인·적용 근거가 아닙니다. Podman과 이미지가 준비되지 않았으면 거부합니다.
+
+`semantic`은 `CODE_ANALYZE` 권한을 재검사하면서 pyright 이미지의 ID를 요구합니다. 대상 Python 파일의 1부터 세는 행·UTF-16 열에서 정의·참조를 찾아 source view에 실제 포함된 파일의 경로만 반환하고, 해당 파일의 진단을 최대 100개까지 보여줍니다. 제외된 파일이나 stdlib stub의 실제 경로는 내보내지 않고 개수만 표시합니다. 저장소의 pyright 설정과 서드파티 의존성은 컨테이너에 넣지 않으므로 결과는 PARTIAL이며, 조회 중 소스가 바뀌면 거부합니다. 코드를 바꾸지 않습니다.
 
 `apply-candidate`는 미리보기에서 받은 후보·소스·Git 기준 해시 3개를 모두 요구합니다. `CHANGE_PROPOSE`, `CODE_ANALYZE`, `PATCH_VERIFY`, `PATCH_APPROVE`, `PATCH_APPLY` 권한을 확인하고, immutable Podman 이미지에서 지정된 pytest가 PASS한 후 한 기존 Python 파일만 worktree에서 교체합니다. 생성 중이거나 검증 중에 기준이 바뀌면 거부하고, 교체 전후 상태를 다시 읽습니다. 결과의 `EXPERIMENTAL_APPLIED`/`formal_verification=false`는 정식 `APPROVED`/`APPLIED` 패치 상태가 아닙니다. 검사에 사용한 PARTIAL source snapshot과 실제 Podman 테스트 환경의 한계를 그대로 유지합니다. 변경 전 Git commit으로 원본을 보존하고 후보·diff·세 해시를 직접 검토해야 합니다.
 
@@ -104,7 +108,7 @@ Risk evidence provider가 아직 연결되지 않은 요소는 `UNAVAILABLE`입�
 - 민감 데이터는 경로 검사 후 읽고 다시 콘텐츠 검사합니다. 내장 detector가 모든 secret을 찾아낸다고 보장하지 않습니다. 발견된 파일은 AST·일반 graph persistence 대상에서 제외합니다.
 - FileArtifacts는 Linux 전용입니다. 암호화 키 저장소가 없으므로 SENSITIVE/PROTECTED artifact는 저장을 차단합니다. Orphan을 자동 삭제하지 않고 조회합니다.
 - 기존 DB를 열 때 audit hash chain을 확인합니다. 프로세스 실행 중 모든 조회에서 재검사하지는 않으며, 마지막 이벤트 삭제나 전체 DB 교체는 DB 밖의 보호된 체크포인트 없이는 확인할 수 없습니다.
-- 내부 Podman backend는 rootless/cgroup v2/seccomp를 확인하고 runtime-safe source view에서 등록된 pytest 명령과 pyright 서버를 실행합니다. 로컬에 이미지가 없으면 통합 테스트가 skip됩니다. `.github/workflows/code-agent-sandbox.yml`은 Linux CI에서 두 이미지를 먼저 빌드하고 rootless/cgroup v2를 확인한 뒤 통합 테스트를 실행합니다. 이미지 준비 또는 실행 실패는 CI 실패이며 skip을 정상 검증으로 보지 않습니다. 이 workflow의 실제 GitHub 실행 결과는 별도로 확인해야 합니다. CLI의 `verify`와 `explain`/`impact` LSP 연결은 아직 제공하지 않습니다.
+- 내부 Podman backend는 rootless/cgroup v2/seccomp를 확인하고 runtime-safe source view에서 등록된 pytest 명령과 pyright 서버를 실행합니다. 로컬에 이미지가 없으면 통합 테스트가 skip됩니다. `.github/workflows/code-agent-sandbox.yml`은 Linux CI에서 두 이미지를 먼저 빌드하고 rootless/cgroup v2를 확인한 뒤 통합 테스트를 실행합니다. 이미지 준비 또는 실행 실패는 CI 실패이며 skip을 정상 검증으로 보지 않습니다. 이 workflow의 실제 GitHub 실행 결과는 별도로 확인해야 합니다. CLI의 `verify` 및 `explain`/`impact` 자동 LSP 연결은 아직 제공하지 않습니다.
 - `PatchStore.finish_verification` 테스트는 trusted 입력에 대한 **저장 일관성** 검증입니다. 실제 repository test/sandbox/approval/apply 성공을 뜻하지 않습니다.
 
 ## 파일 위치

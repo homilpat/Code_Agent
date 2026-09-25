@@ -4,7 +4,9 @@ import shutil
 import stat
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from types import SimpleNamespace
 
 import pytest
@@ -21,6 +23,7 @@ from kh_agent.repository.identity import RepositoryIdentityResolver
 from kh_agent.repository.safe_git import CLEAN, SafeGitInspector, inspect_target, revalidate_target
 from kh_agent.repository.snapshot import SourceScanner
 from kh_agent.sandbox.container import SandboxResult
+from kh_agent.sandbox.lsp import Diagnostic, Location
 from kh_agent.security.ingestion import IngestionPolicy
 from kh_agent.store.database import Database
 from kh_agent.store.registry import Registry
@@ -329,6 +332,69 @@ def test_status_reports_the_safe_git_target(repo, application):
     assert dirty["working_tree_dirty"] is True and dirty["unstaged_changes"] == 1
     assert dirty["mutation_ready"] is False
     assert dirty["target_state_digest"] != clean["target_state_digest"]
+
+
+def test_semantic_query_limits_paths_and_detects_source_change(repo, application, monkeypatch):
+    path, _ = repo
+    app = application(path)
+    seen = []
+
+    class FakeSession:
+        def __init__(self, stdin, stdout, on_failure):
+            pass
+
+        def close(self):
+            seen.append("closed")
+
+    class FakeClient:
+        def __init__(self, session, request_timeout):
+            assert request_timeout == 90
+
+        def open(self, target, content):
+            assert (target, content) == ("app.py", "def app():\n    return 1\n")
+
+        def definition(self, target, line, column):
+            assert (target, line, column) == ("app.py", 0, 4)
+            return (Location("app.py", 0, 4, 0, 7), Location(None, 1, 0, 1, 2))
+
+        def references(self, target, line, column):
+            if seen and seen[0] == "change":
+                (path / "app.py").write_text("def changed(): pass\n")
+            return (Location("excluded.py", 0, 0, 0, 1), Location("app.py", 0, 4, 0, 7))
+
+        def diagnostics(self, target):
+            return (Diagnostic(target, 1, 3, 1, "reportProblem", "bad value"),)
+
+    class FakeBackend:
+        def __init__(self, image):
+            assert image == "a" * 64
+
+        @contextmanager
+        def language_server(self, command, snapshot):
+            assert command.template_id == "python-language-server"
+            assert snapshot.completeness == "PARTIAL"
+            yield SimpleNamespace(stdin=None, stdout=None, kill=lambda: None,
+                                  plan_hash="b" * 64, attestation_digest="c" * 64)
+
+    monkeypatch.setattr("kh_agent.application.LspSession", FakeSession)
+    monkeypatch.setattr("kh_agent.application.PythonLanguageClient", FakeClient)
+    app.sandbox_factory = FakeBackend
+    result = app.semantic_query(path, "app.py", 1, 5, "a" * 64)
+    assert result["definitions"] == [{"path": "app.py", "line": 1, "column": 5}]
+    assert result["definitions_outside_view"] == 1
+    assert result["references_outside_view"] == 1
+    assert result["diagnostics"][0]["line"] == 2
+    assert result["source_completeness"] == "PARTIAL"
+    assert "THIRD_PARTY_DEPENDENCIES_NOT_MOUNTED" in result["limitations"]
+    assert seen == ["closed"]
+
+    with pytest.raises(DomainError) as invalid:
+        app.semantic_query(path, "app.py", 0, 5, "a" * 64)
+    assert invalid.value.code == ErrorCode.INVALID_INPUT
+    seen[:] = ["change"]
+    with pytest.raises(DomainError) as changed:
+        app.semantic_query(path, "app.py", 1, 5, "a" * 64)
+    assert changed.value.code == ErrorCode.REPOSITORY_STATE_BLOCKED
 
 
 def test_mutation_gate_rejects_change_between_two_inspections(repo, application):

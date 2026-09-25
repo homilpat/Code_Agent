@@ -17,7 +17,11 @@ from kh_agent.repository.metadata import MetadataInspector
 from kh_agent.repository.safe_git import TargetSnapshot
 from kh_agent.repository.snapshot import SourceScanner
 from kh_agent.sandbox.container import RootlessContainerBackend
-from kh_agent.sandbox.policy import IMAGE_REFERENCE, PytestRequest, compile_pytest
+from kh_agent.sandbox.lsp import Location, LspSession, PythonLanguageClient
+from kh_agent.sandbox.policy import (
+    IMAGE_REFERENCE, LanguageServerRequest, PytestRequest, compile_language_server,
+    compile_pytest,
+)
 from kh_agent.store.database import Database
 from kh_agent.store.graphs import GraphStore
 from kh_agent.store.registry import Registry
@@ -54,6 +58,99 @@ class Application:
         self.target_inspector = target_inspector
         self.sandbox_factory = sandbox_factory or RootlessContainerBackend
         self.model_factory = model_factory or LocalModelClient
+
+    def semantic_query(
+        self, path: Path, target: str, line: int, column: int, image: str
+    ) -> dict:
+        """Read-only bounded pyright evidence from an isolated source view."""
+        identity = self.identities.resolve()
+        repository = self.resolver.resolve(path)
+        repository_id = self.registry.lookup(repository)
+        self.authorization.authorize(identity, repository_id, "explain")
+        if type(image) is not str or not IMAGE_REFERENCE.fullmatch(image):
+            raise DomainError(ErrorCode.INVALID_INPUT, "An immutable pyright image is required")
+        if type(line) is not int or type(column) is not int or line < 1 or column < 1:
+            raise DomainError(ErrorCode.INVALID_INPUT, "Line and column must be positive")
+        raw = target_path(target)
+        if not raw.endswith(b".py"):
+            raise DomainError(ErrorCode.INVALID_INPUT, "A Python source target is required")
+        snapshot = self.scanner.scan(repository)
+        source = next((item for item in snapshot.files if item.path == raw), None)
+        if source is None:
+            raise DomainError(ErrorCode.CAPABILITY_NOT_AVAILABLE, "Target is outside source view")
+        try:
+            decoded = source.content.decode("utf-8", "strict")
+        except UnicodeDecodeError as exc:
+            raise DomainError(ErrorCode.CAPABILITY_NOT_AVAILABLE, "Target is not UTF-8") from exc
+        if self.resolver.resolve(path) != repository:
+            raise DomainError(ErrorCode.REPOSITORY_IDENTITY_CHANGED)
+        self.authorization.authorize(identity, repository_id, "explain", "AFTER_SOURCE_INGESTION")
+        backend = self.sandbox_factory(image)
+        with backend.language_server(
+            compile_language_server(LanguageServerRequest(300)), snapshot
+        ) as server:
+            session = LspSession(server.stdin, server.stdout, on_failure=server.kill)
+            try:
+                client = PythonLanguageClient(session, request_timeout=90)
+                client.open(target, decoded)
+                definitions = client.definition(target, line - 1, column - 1)
+                references = client.references(target, line - 1, column - 1)
+                diagnostics = client.diagnostics(target)
+            finally:
+                session.close()
+        if self.resolver.resolve(path) != repository:
+            raise DomainError(ErrorCode.REPOSITORY_IDENTITY_CHANGED)
+        if self.scanner.scan(repository).snapshot_hash != snapshot.snapshot_hash:
+            raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED, "Source changed during query")
+        self.authorization.authorize(identity, repository_id, "explain", "AFTER_SOURCE_INGESTION")
+        included: set[str] = set()
+        for item in snapshot.files:
+            try:
+                included.add(item.path.decode("utf-8", "strict"))
+            except UnicodeDecodeError:
+                continue
+
+        def bounded_locations(
+            locations: tuple[Location, ...]
+        ) -> tuple[list[dict], bool, int]:
+            visible = [item for item in locations if item.path in included]
+            return [
+                {"path": item.path, "line": item.start_line + 1,
+                 "column": item.start_character + 1}
+                for item in visible[:100]
+            ], len(visible) > 100, len(locations) - len(visible)
+
+        found_definitions, definitions_truncated, definitions_outside = bounded_locations(
+            definitions
+        )
+        found_references, references_truncated, references_outside = bounded_locations(
+            references
+        )
+        return {
+            "repository_id": repository_id,
+            "status": "SANDBOXED_SEMANTIC_PARTIAL",
+            "target": target,
+            "source_snapshot_hash": snapshot.snapshot_hash,
+            "source_completeness": snapshot.completeness,
+            "limitations": [*snapshot.limitations, "ONLY_INCLUDED_PYTHON_FILES",
+                            "REPOSITORY_PYRIGHT_CONFIG_NOT_LOADED",
+                            "THIRD_PARTY_DEPENDENCIES_NOT_MOUNTED"],
+            "workspace_ready": True,
+            "definitions": found_definitions,
+            "definitions_truncated": definitions_truncated,
+            "definitions_outside_view": definitions_outside,
+            "references": found_references,
+            "references_truncated": references_truncated,
+            "references_outside_view": references_outside,
+            "diagnostics": [
+                {"line": item.line + 1, "column": item.character + 1,
+                 "severity": item.severity, "code": item.code, "message": item.message}
+                for item in diagnostics[:100]
+            ],
+            "diagnostics_truncated": len(diagnostics) > 100,
+            "plan_hash": server.plan_hash,
+            "attestation_digest": server.attestation_digest,
+        }
 
     def generate_preview(
         self, path: Path, target: str, request: str, model: str, port: int = 1234

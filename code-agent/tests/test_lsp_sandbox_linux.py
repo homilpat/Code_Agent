@@ -6,7 +6,10 @@ import sys
 
 import pytest
 
+from kh_agent.application import Application
 from kh_agent.core.errors import DomainError
+from kh_agent.identity.service import Identity
+from kh_agent.repository.identity import RepositoryIdentityResolver
 from kh_agent.repository.snapshot import SourceFile, SourceSnapshot
 from kh_agent.sandbox.container import RootlessContainerBackend
 from kh_agent.sandbox.lsp import LspSession, PythonLanguageClient
@@ -16,6 +19,8 @@ from kh_agent.sandbox.policy import (
     compile_language_server,
     compile_pytest,
 )
+from kh_agent.store.database import Database
+from kh_agent.store.registry import Registry
 
 IMAGE_TAG = "localhost/kh-python-pyright:v1"
 FILES = {
@@ -117,3 +122,36 @@ def test_killed_server_fails_closed_and_templates_cannot_be_mixed():
     ):
         pass
     assert not managed_containers(backend)
+
+
+def test_semantic_command_service_reads_real_repository_in_podman(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "lib.py").write_text("def helper(value: int) -> int:\n    return value + 1\n")
+    (repo / "app.py").write_text("from lib import helper\nresult = helper(2)\n")
+    home = tmp_path / "git-home"
+    home.mkdir()
+    env = {
+        "PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(home),
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@example.invalid",
+        "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.invalid",
+    }
+    for args in (("init", "-q", "-b", "main"), ("add", "app.py", "lib.py"),
+                 ("commit", "-q", "-m", "initial")):
+        subprocess.run([shutil.which("git") or "/usr/bin/git", "-C", str(repo), *args],
+                       env=env, check=True, capture_output=True)  # noqa: S603
+    db = Database(tmp_path / "store" / "state.db")
+    try:
+        registry = Registry(db)
+        actor = Identity(registry.bootstrap("linux-uid:1000"), "OS_MAPPING")
+        monkeypatch.setattr("kh_agent.identity.service.current_os_principal",
+                            lambda: "linux-uid:1000")
+        registry.register(actor, RepositoryIdentityResolver().resolve(repo), "register")
+        result = Application(db).semantic_query(repo, "app.py", 2, 10, str(IMAGE))
+        assert result["status"] == "SANDBOXED_SEMANTIC_PARTIAL"
+        assert any(item["path"] == "lib.py" for item in result["definitions"])
+        assert any(item["path"] == "app.py" for item in result["references"])
+        assert result["source_completeness"] == "PARTIAL"
+    finally:
+        db.close()

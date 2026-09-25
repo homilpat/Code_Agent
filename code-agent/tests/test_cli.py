@@ -15,7 +15,7 @@ def test_help_and_doctor_do_not_require_linux():
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
-    assert payload["sandbox"] == "NOT_AVAILABLE"
+    assert payload["sandbox"] == "REQUIRES_ROOTLESS_PODMAN_AND_PREBUILT_IMAGE"
     assert payload["approval_apply"] == "NOT_AVAILABLE"
 
 
@@ -88,6 +88,25 @@ def test_modify_routes_targeted_request_to_local_preview(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert seen["target"] == "app.py" and seen["model"] == "local/model"
     assert seen["request"] == "Fix the value" and seen["port"] == 1234
+
+
+def test_semantic_cli_routes_location_and_image(monkeypatch, tmp_path):
+    seen = {}
+
+    def semantic_query(path, target, line, column, image):
+        seen.update(path=path, target=target, line=line, column=column, image=image)
+        return {"status": "SANDBOXED_SEMANTIC_PARTIAL"}
+
+    monkeypatch.setattr("kh_agent.cli.app.require_linux_store", lambda root: root)
+    monkeypatch.setattr("kh_agent.cli.app.Database",
+                        lambda path: SimpleNamespace(close=lambda: None))
+    monkeypatch.setattr("kh_agent.cli.app._application",
+                        lambda ctx, db: SimpleNamespace(semantic_query=semantic_query))
+    result = runner.invoke(app, ["semantic", "src/app.py", "--line", "5", "--column", "10",
+                                 "--image", "a" * 64, "--repo", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert seen == {"path": tmp_path, "target": "src/app.py", "line": 5,
+                    "column": 10, "image": "a" * 64}
 
 
 def test_modify_routes_generated_candidate_to_test_and_requires_both_options(

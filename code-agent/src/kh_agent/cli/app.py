@@ -126,7 +126,7 @@ def doctor() -> None:
                     "patch_verification_persistence",
                 ],
                 "source_analysis": "PYTHON_STATIC_PARTIAL_LINUX_ONLY",
-                "sandbox": "NOT_AVAILABLE",
+                "sandbox": "REQUIRES_ROOTLESS_PODMAN_AND_PREBUILT_IMAGE",
                 "approval_apply": "NOT_AVAILABLE",
                 "web_auth_bridge": "NOT_AVAILABLE",
             }
@@ -216,6 +216,19 @@ def explain(ctx: typer.Context, target: str, repo: RepoOption = Path(".")) -> No
 def impact(ctx: typer.Context, target: str, repo: RepoOption = Path(".")) -> None:
     """Find import-name candidates for a Python file; risk is not available yet."""
     _run(ctx, lambda db: _application(ctx, db).execute("impact", repo, target))
+
+
+@app.command()
+def semantic(
+    ctx: typer.Context,
+    target: str,
+    line: Annotated[int, typer.Option(min=1, help="One-based source line.")],
+    column: Annotated[int, typer.Option(min=1, help="One-based UTF-16 column.")],
+    image: Annotated[str, typer.Option(help="Prebuilt immutable pyright image ID.")],
+    repo: RepoOption = Path("."),
+) -> None:
+    """Find definitions, references and diagnostics using sandboxed pyright."""
+    _run(ctx, lambda db: _application(ctx, db).semantic_query(repo, target, line, column, image))
 
 
 @app.command()
