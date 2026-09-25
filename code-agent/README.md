@@ -101,7 +101,7 @@ Risk evidence provider가 아직 연결되지 않은 요소는 `UNAVAILABLE`입�
 
 ## 검증과 운영 한계
 
-- `status`는 고정 plumbing Git 명령으로 HEAD 객체·index·worktree를 검사합니다. ignore 규칙과 관계없이 정책상 제외되지 않은 untracked 파일도 변경으로 기록하고, mutation gate는 두 번의 검사를 대조합니다. 그래도 전체 repository의 원자적 snapshot, 두 검사 사이의 일시적 변경, 이후 적용 시점의 동일성을 증명하지 않습니다. 실제 apply 연결 시 기준 snapshot과 적용 직전 상태를 재검사해야 합니다.
+- `status`는 고정 plumbing Git 명령으로 HEAD 객체·index·worktree를 검사합니다. ignore 규칙과 관계없이 정책상 제외되지 않은 untracked 파일도 변경으로 기록하고, 각 Safe Git 검사 안에서도 두 번의 전체 관찰이 다르면 거부합니다. mutation gate는 검사 결과를 다시 대조합니다. 그래도 전체 repository의 원자적 snapshot, 두 검사 사이에 바뀌었다 돌아온 상태, 이후 적용 시점의 동일성을 증명하지 않습니다. 실제 apply 연결 시 기준 snapshot과 적용 직전 상태를 재검사해야 합니다.
 - 내장 ingestion 정책은 `.pyc`, `.pyo`, `.log` 생성 파일을 source view와 untracked 변경 판정에서 제외합니다. 이미 Git이 추적하는 파일의 변경은 계속 검사합니다. 그 밖의 ignored 파일은 내용에 영향을 줄 수 있으므로 보수적으로 변경으로 처리합니다.
 - Source/graph는 현재 `PARTIAL`입니다. Safe Git target 검사와 source scanner는 별도 경로로, 둘 사이의 원자적 일치나 완전한 object-source authorization을 증명하지 않습니다. graph 결과를 mutation base로 승인하지 않습니다.
 - AST는 구문 evidence입니다. 함수 실행, 동적 import, import root와 호출 대상의 최종 해석은 수행하지 않습니다. 파싱 실패를 전체 성공으로 숨기지 않습니다.

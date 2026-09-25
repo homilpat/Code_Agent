@@ -97,6 +97,48 @@ def test_clean_repository_is_complete_mutation_ready_and_deterministic(repo):
     assert first.state_digest == second.state_digest
 
 
+def test_safe_git_refuses_head_change_during_a_single_capture(repo, monkeypatch):
+    path, git = repo
+    inspector = SafeGitInspector(RepositoryIdentityResolver().resolve(path), "repo_test")
+    original = inspector._untracked
+    seen = 0
+
+    def move_head(object_format):
+        nonlocal seen
+        result = original(object_format)
+        seen += 1
+        if seen == 1:
+            git("commit", "-q", "--allow-empty", "-m", "concurrent head")
+        return result
+
+    monkeypatch.setattr(inspector, "_untracked", move_head)
+    with pytest.raises(DomainError) as error:
+        inspector.snapshot()
+    assert error.value.code == ErrorCode.REPOSITORY_STATE_BLOCKED
+    assert seen == 2
+
+
+def test_safe_git_refuses_worktree_change_during_a_single_capture(repo, monkeypatch):
+    path, _ = repo
+    inspector = SafeGitInspector(RepositoryIdentityResolver().resolve(path), "repo_test")
+    original = inspector._untracked
+    seen = 0
+
+    def change_source(object_format):
+        nonlocal seen
+        result = original(object_format)
+        seen += 1
+        if seen == 1:
+            (path / "app.py").write_text("def changed(): pass\n")
+        return result
+
+    monkeypatch.setattr(inspector, "_untracked", change_source)
+    with pytest.raises(DomainError) as error:
+        inspector.snapshot()
+    assert error.value.code == ErrorCode.REPOSITORY_STATE_BLOCKED
+    assert seen == 2
+
+
 @pytest.mark.req("M02-SNP-001", "M02-SNP-002", "M02-SNP-003")
 def test_staged_unstaged_and_relevant_untracked_changes_are_recorded(repo):
     path, git = repo

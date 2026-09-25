@@ -388,7 +388,8 @@ class SafeGitInspector:
             os.close(root_fd)
         return records
 
-    def snapshot(self) -> TargetSnapshot:
+    def _observe(self) -> dict:
+        """One bounded Git/worktree pass; no pass is an atomic repository snapshot."""
         operations = MetadataInspector().inspect(self.identity)["git_operations"]
         object_format = self._git("rev-parse", "--show-object-format")[1].strip().decode("ascii")
         if object_format not in ("sha1", "sha256"):
@@ -401,6 +402,36 @@ class SafeGitInspector:
         staged = self._staged(head["commit_sha"])
         unstaged, uncertain = self._unstaged(entries, skip, object_format, config)
         untracked = self._untracked(object_format)
+        return {
+            "operations": operations,
+            "object_format": object_format,
+            "head": head,
+            "config": config,
+            "skip": skip,
+            "objects": objects,
+            "entries": entries,
+            "staged": staged,
+            "unstaged": unstaged,
+            "uncertain": uncertain,
+            "untracked": untracked,
+        }
+
+    def snapshot(self) -> TargetSnapshot:
+        first = self._observe()
+        second = self._observe()
+        if first != second:
+            raise DomainError(
+                ErrorCode.REPOSITORY_STATE_BLOCKED, "Git or worktree changed during inspection"
+            )
+        operations = second["operations"]
+        object_format = second["object_format"]
+        head = second["head"]
+        skip = second["skip"]
+        objects = second["objects"]
+        staged = second["staged"]
+        unstaged = second["unstaged"]
+        uncertain = second["uncertain"]
+        untracked = second["untracked"]
         dirty = bool(staged or unstaged or untracked)
         changes = {
             "staged": staged,
@@ -457,7 +488,7 @@ class SafeGitInspector:
             ).digest,
             scope="REPOSITORY_WORKTREE",
             captured_at_utc=utc_now(),
-            capture_method="safe-git-inspection-v1",
+            capture_method="safe-git-double-inspection-v1",
             completeness=completeness,
             mutation_ready=mutation_ready,
             evidence=evidence,
