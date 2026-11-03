@@ -1,1 +1,0 @@
-export default function Footer(){return <footer className="border-t border-[#c4c6cf] bg-white px-8 py-4 text-xs text-[#545f72]"><div className="mx-auto flex max-w-[1200px] justify-between"><span className="mono">KNOWLEDGE HUB</span><span>© {new Date().getFullYear()} Knowledge Hub</span></div></footer>}

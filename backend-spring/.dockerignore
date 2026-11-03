@@ -1,8 +1,0 @@
-.env
-.env.*
-build/
-.gradle/
-*.pem
-*.key
-secrets/
-.git/
