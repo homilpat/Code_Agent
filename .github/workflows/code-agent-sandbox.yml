@@ -71,4 +71,4 @@ jobs:
       - name: Ruff static checks and formatting
         run: |
           uv run ruff check .
-          uv run ruff format --check .
+          uv run ruff format --check src tests evals

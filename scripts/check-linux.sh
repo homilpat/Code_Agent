@@ -11,5 +11,5 @@ if [[ ! -x .venv/bin/python ]]; then
 fi
 .venv/bin/python -m pytest -q
 .venv/bin/ruff check .
-.venv/bin/ruff format --check .
+.venv/bin/ruff format --check src tests evals
 .venv/bin/python -m kh_agent doctor

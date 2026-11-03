@@ -64,7 +64,7 @@ See [migration notes](docs/CLI_MIGRATION.md) for the old-to-new directory mappin
 ```bash
 uv run pytest -q
 uv run ruff check .
-uv run ruff format --check .
+uv run ruff format --check src tests evals
 python -m pytest evals/tests -p no:cacheprovider
 ```
 
