@@ -67,7 +67,7 @@ jobs:
       - name: Other Code Agent tests and evaluation harness
         run: |
           uv run pytest -q --ignore=tests/test_sandbox_container_linux.py --ignore=tests/test_lsp_sandbox_linux.py
-          uv run pytest -q evals/tests -p no:cacheprovider
+          uv run python -m pytest -q evals/tests -p no:cacheprovider
       - name: Ruff static checks and formatting
         run: |
           uv run ruff check .
