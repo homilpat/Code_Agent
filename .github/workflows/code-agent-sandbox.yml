@@ -68,6 +68,38 @@ jobs:
         run: |
           uv run pytest -q --ignore=tests/test_sandbox_container_linux.py --ignore=tests/test_lsp_sandbox_linux.py
           uv run python -m pytest -q evals/tests -p no:cacheprovider
+      - name: MCP v2 SDK stdio protocol smoke
+        run: |
+          uv run --with 'mcp>=2,<3' python - <<'PY'
+          import sys
+          import anyio
+          from mcp import Client, StdioServerParameters
+
+          async def run():
+              params = StdioServerParameters(
+                  command=sys.executable,
+                  args=["-m", "kh_agent.mcp_server"],
+              )
+              async with Client(params) as client:
+                  tools = await client.list_tools()
+                  names = {tool.name for tool in tools.tools}
+                  expected = {
+                      "repository_status",
+                      "audit_history",
+                      "explain_python",
+                      "impact_candidates",
+                      "propose_python_change",
+                  }
+                  assert names == expected, (names, expected)
+                  outcome = await client.call_tool(
+                      "repository_status", {"repository": "relative/not-registered"}
+                  )
+                  assert not outcome.is_error, outcome
+                  assert outcome.structured_content["error"] == "INVALID_ARGUMENT"
+                  assert outcome.structured_content["ok"] is False
+
+          anyio.run(run)
+          PY
       - name: Ruff static checks and formatting
         run: |
           uv run ruff check .
