@@ -32,9 +32,12 @@ class Workspace:
         self.task = task
         self.root = Path(tempfile.mkdtemp(prefix=f"{task.id}-", dir=work_root))
         # autocrlf off: the workspace must hold the committed bytes, not Windows checkout bytes.
-        archive = subprocess.run(
+        git_binary = shutil.which("git")
+        if git_binary is None:
+            raise RuntimeError("git executable is not available")
+        archive = subprocess.run(  # noqa: S603 - fixed git command, shell=False
             [
-                "git",
+                git_binary,
                 "-C",
                 str(repo_root),
                 "-c",
@@ -65,7 +68,9 @@ class Workspace:
         for package in (self.project / "src").iterdir():
             if not (package / "__init__.py").is_file():
                 continue
-            completed = subprocess.run(
+            if not package.name.isidentifier():
+                raise RuntimeError("Unsafe Python package name in benchmark workspace")
+            completed = subprocess.run(  # noqa: S603 - caller-selected trusted Python
                 [python, "-c", f"import {package.name}; print({package.name}.__file__)"],
                 cwd=self.project,
                 env=self.env(),
@@ -121,7 +126,7 @@ class Workspace:
             *selection,
         ]
         try:
-            completed = subprocess.run(
+            completed = subprocess.run(  # noqa: S603 - explicit trusted pytest argv
                 command,
                 cwd=self.project,
                 env=self.env(),
@@ -143,7 +148,10 @@ class Workspace:
 
 def _parse_junit(path: Path) -> TestReport:
     report = TestReport()
-    for case in ElementTree.parse(path).iter("testcase"):
+    xml = path.read_bytes()
+    if b"<!DOCTYPE" in xml.upper() or b"<!ENTITY" in xml.upper():
+        raise ValueError("JUnit report must not include a DTD or entity declaration")
+    for case in ElementTree.fromstring(xml).iter("testcase"):  # noqa: S314 - DTD rejected
         test_id = _node_id(case.get("classname", ""), case.get("name", ""))
         if case.find("failure") is not None or case.find("error") is not None:
             report.failed.add(test_id)

@@ -146,12 +146,12 @@ def test_semantic_command_service_reads_real_repository_in_podman(tmp_path, monk
         ("add", "app.py", "lib.py"),
         ("commit", "-q", "-m", "initial"),
     ):
-        subprocess.run(
+        subprocess.run(  # noqa: S603 - fixed git test fixture commands
             [shutil.which("git") or "/usr/bin/git", "-C", str(repo), *args],
             env=env,
             check=True,
             capture_output=True,
-        )  # noqa: S603
+        )
     db = Database(tmp_path / "store" / "state.db")
     try:
         registry = Registry(db)
