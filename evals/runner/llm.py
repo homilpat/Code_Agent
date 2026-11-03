@@ -4,8 +4,8 @@ import json
 import re
 import time
 import urllib.request
-from urllib.parse import urlsplit
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 THINK = re.compile(r"<think>.*?</think>", re.S)
 
