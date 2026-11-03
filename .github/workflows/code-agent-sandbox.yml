@@ -55,12 +55,10 @@ jobs:
             -f config/sandbox/python-pyright.Containerfile config/sandbox
           podman image inspect localhost/kh-python-pytest:v1 >/dev/null
           podman image inspect localhost/kh-python-pyright:v1 >/dev/null
-      - name: CLI smoke and static checks
+      - name: CLI smoke
         run: |
           uv run code-agent --help
           uv run code-agent doctor
-          uv run ruff check .
-          uv run ruff format --check .
       - name: Real Podman and pyright integration tests
         env:
           KH_REQUIRE_SANDBOX_TESTS: '1'
@@ -70,3 +68,7 @@ jobs:
         run: |
           uv run pytest -q --ignore=tests/test_sandbox_container_linux.py --ignore=tests/test_lsp_sandbox_linux.py
           uv run pytest -q evals/tests -p no:cacheprovider
+      - name: Ruff static checks and formatting
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
