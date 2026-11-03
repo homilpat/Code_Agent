@@ -7,7 +7,6 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
-from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -415,8 +414,13 @@ def test_semantic_query_limits_paths_and_detects_source_change(repo, application
         def language_server(self, command, snapshot):
             assert command.template_id == "python-language-server"
             assert snapshot.completeness == "PARTIAL"
-            yield SimpleNamespace(stdin=None, stdout=None, kill=lambda: None,
-                                  plan_hash="b" * 64, attestation_digest="c" * 64)
+            yield SimpleNamespace(
+                stdin=None,
+                stdout=None,
+                kill=lambda: None,
+                plan_hash="b" * 64,
+                attestation_digest="c" * 64,
+            )
 
     monkeypatch.setattr("kh_agent.application.LspSession", FakeSession)
     monkeypatch.setattr("kh_agent.application.PythonLanguageClient", FakeClient)
@@ -683,8 +687,15 @@ def test_model_generated_candidate_runs_once_in_ephemeral_test_view(repo, applic
         def generate(self, request, target, source):
             calls.append((request, target, source))
             return json.dumps(
-                {"operations": [{"path": "app.py", "operation": "modify",
-                                 "content": "def app():\n    return 8\n"}]}
+                {
+                    "operations": [
+                        {
+                            "path": "app.py",
+                            "operation": "modify",
+                            "content": "def app():\n    return 8\n",
+                        }
+                    ]
+                }
             ).encode()
 
     class FakeBackend:
@@ -702,7 +713,11 @@ def test_model_generated_candidate_runs_once_in_ephemeral_test_view(repo, applic
     app.sandbox_factory = FakeBackend
     head = git("rev-parse", "HEAD")
     result = app.generate_and_verify(
-        path, "app.py", "Change the return value", "local/model", "a" * 64,
+        path,
+        "app.py",
+        "Change the return value",
+        "local/model",
+        "a" * 64,
         ("tests/test_app.py",),
     )
     assert calls == [("Change the return value", "app.py", b"def app():\n    return 1\n")]
@@ -818,7 +833,11 @@ def test_worktree_journal_records_write_before_replacement(repo, application):
         assert inspect_target(identity, repository_id).state_digest == target.state_digest
 
     result = journaled_replace_source_file(
-        journal, repository_id, actor.user_id, identity, source,
+        journal,
+        repository_id,
+        actor.user_id,
+        identity,
+        source,
         b"def app():\n    return 9\n",
         source_snapshot_hash=source_snapshot.snapshot_hash,
         target_state_digest=target.state_digest,
@@ -831,7 +850,8 @@ def test_worktree_journal_records_write_before_replacement(repo, application):
         "ORDER BY sequence"
     )
     assert [row["event_type"] for row in rows] == [
-        "WORKTREE_WRITE_PREPARED", "WORKTREE_WRITE_FINISHED"
+        "WORKTREE_WRITE_PREPARED",
+        "WORKTREE_WRITE_FINISHED",
     ]
 
 
@@ -869,14 +889,20 @@ def test_failed_completion_leaves_durable_pending_write(repo, application):
         assert WorktreeWriteJournal(reopened).pending(repository_id) == pending
         with pytest.raises(DomainError) as blocked:
             WorktreeWriteJournal(reopened).prepare(
-                repository_id, actor.user_id, path=b"app.py",
-                before_sha256=source.content_hash, after_sha256="e" * 64,
+                repository_id,
+                actor.user_id,
+                path=b"app.py",
+                before_sha256=source.content_hash,
+                after_sha256="e" * 64,
                 **{key: parameters[key] for key in ("source_snapshot_hash", "target_state_digest")},
             )
         assert blocked.value.code == ErrorCode.CRITICAL_PERSISTENCE_FAILED
-        assert WorktreeWriteJournal(reopened).reconcile(
-            repository_id, actor.user_id, pending[0], identity, b"app.py"
-        ) == "REPLACEMENT_BYTES"
+        assert (
+            WorktreeWriteJournal(reopened).reconcile(
+                repository_id, actor.user_id, pending[0], identity, b"app.py"
+            )
+            == "REPLACEMENT_BYTES"
+        )
         assert WorktreeWriteJournal(reopened).pending(repository_id) == []
     finally:
         reopened.close()
@@ -897,7 +923,12 @@ def test_pending_write_blocks_status_readiness_even_when_git_is_clean(repo, appl
 
     with pytest.raises(DomainError):
         journaled_replace_source_file(
-            journal, repository_id, actor.user_id, identity, source, b"x = 9\n",
+            journal,
+            repository_id,
+            actor.user_id,
+            identity,
+            source,
+            b"x = 9\n",
             source_snapshot_hash=snapshot.snapshot_hash,
             target_state_digest=inspect_target(identity, repository_id).state_digest,
             precommit=interrupt,
@@ -928,7 +959,12 @@ def test_reconciliation_refuses_unknown_bytes_and_keeps_pending(repo, applicatio
 
     with pytest.raises(DomainError):
         journaled_replace_source_file(
-            journal, repository_id, actor.user_id, identity, source, b"x = 9\n",
+            journal,
+            repository_id,
+            actor.user_id,
+            identity,
+            source,
+            b"x = 9\n",
             source_snapshot_hash=snapshot.snapshot_hash,
             target_state_digest=inspect_target(identity, repository_id).state_digest,
             precommit=interrupt,
@@ -947,10 +983,19 @@ def test_explicit_candidate_apply_requires_reviewed_hash_and_fresh_passing_test(
     path, git = repo
     app = application(path)
     candidate = tmp_path / "candidate.json"
-    candidate.write_text(json.dumps({
-        "operations": [{"path": "app.py", "operation": "modify",
-                        "content": "def app():\n    return 42\n"}]
-    }))
+    candidate.write_text(
+        json.dumps(
+            {
+                "operations": [
+                    {
+                        "path": "app.py",
+                        "operation": "modify",
+                        "content": "def app():\n    return 42\n",
+                    }
+                ]
+            }
+        )
+    )
     review = app.preview(path, candidate)
     reviewed = review["candidate_hash"]
     seen = []
@@ -962,29 +1007,51 @@ def test_explicit_candidate_apply_requires_reviewed_hash_and_fresh_passing_test(
         def execute(self, command, snapshot):
             seen.append((command.argv[-1], snapshot.files[0].content))
             return SandboxResult(
-                "PASS", 0, "EXITED", "1 passed", False, "d" * 64,
-                1.0, "b" * 64, "c" * 64,
+                "PASS",
+                0,
+                "EXITED",
+                "1 passed",
+                False,
+                "d" * 64,
+                1.0,
+                "b" * 64,
+                "c" * 64,
             )
 
     app.sandbox_factory = PassingBackend
     with pytest.raises(DomainError) as wrong:
-        app.apply_tested_candidate(path, candidate, "e" * 64,
-                                   review["source_snapshot_hash"], review["target_state_digest"],
-                                   "a" * 64,
-                                   ("tests/test_app.py",))
+        app.apply_tested_candidate(
+            path,
+            candidate,
+            "e" * 64,
+            review["source_snapshot_hash"],
+            review["target_state_digest"],
+            "a" * 64,
+            ("tests/test_app.py",),
+        )
     assert wrong.value.code == ErrorCode.VERIFICATION_BASIS_MISMATCH
     assert seen == [] and (path / "app.py").read_text() == "def app():\n    return 1\n"
     with pytest.raises(DomainError) as wrong_base:
         app.apply_tested_candidate(
-            path, candidate, reviewed, "e" * 64, review["target_state_digest"],
-            "a" * 64, ("tests/test_app.py",)
+            path,
+            candidate,
+            reviewed,
+            "e" * 64,
+            review["target_state_digest"],
+            "a" * 64,
+            ("tests/test_app.py",),
         )
     assert wrong_base.value.code == ErrorCode.VERIFICATION_BASIS_MISMATCH
     assert seen == []
     before = git("rev-parse", "HEAD")
     result = app.apply_tested_candidate(
-        path, candidate, reviewed, review["source_snapshot_hash"],
-        review["target_state_digest"], "a" * 64, ("tests/test_app.py",)
+        path,
+        candidate,
+        reviewed,
+        review["source_snapshot_hash"],
+        review["target_state_digest"],
+        "a" * 64,
+        ("tests/test_app.py",),
     )
     assert seen == [("tests/test_app.py", b"def app():\n    return 42\n")]
     assert result["status"] == "EXPERIMENTAL_APPLIED"
@@ -1008,9 +1075,11 @@ def test_candidate_apply_refuses_failed_test_without_writing(repo, application, 
     path, _ = repo
     app = application(path)
     candidate = tmp_path / "candidate.json"
-    candidate.write_text(json.dumps({
-        "operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]
-    }))
+    candidate.write_text(
+        json.dumps(
+            {"operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]}
+        )
+    )
     review = app.preview(path, candidate)
     reviewed = review["candidate_hash"]
 
@@ -1020,29 +1089,44 @@ def test_candidate_apply_refuses_failed_test_without_writing(repo, application, 
 
         def execute(self, command, snapshot):
             return SandboxResult(
-                "FAIL", 1, "EXITED", "1 failed", False, "d" * 64,
-                1.0, "b" * 64, "c" * 64,
+                "FAIL",
+                1,
+                "EXITED",
+                "1 failed",
+                False,
+                "d" * 64,
+                1.0,
+                "b" * 64,
+                "c" * 64,
             )
 
     app.sandbox_factory = FailingBackend
     with pytest.raises(DomainError) as failed:
-        app.apply_tested_candidate(path, candidate, reviewed,
-                                   review["source_snapshot_hash"], review["target_state_digest"],
-                                   "a" * 64,
-                                   ("tests/test_app.py",))
+        app.apply_tested_candidate(
+            path,
+            candidate,
+            reviewed,
+            review["source_snapshot_hash"],
+            review["target_state_digest"],
+            "a" * 64,
+            ("tests/test_app.py",),
+        )
     assert failed.value.code == ErrorCode.PATCH_NOT_VERIFIED
     assert (path / "app.py").read_text() == "def app():\n    return 1\n"
-    assert not WorktreeWriteJournal(app.db).pending(app.registry.lookup(
-        RepositoryIdentityResolver().resolve(path)))
+    assert not WorktreeWriteJournal(app.db).pending(
+        app.registry.lookup(RepositoryIdentityResolver().resolve(path))
+    )
 
 
 def test_candidate_apply_rejects_repository_change_during_test(repo, application, tmp_path):
     path, _ = repo
     app = application(path)
     candidate = tmp_path / "candidate.json"
-    candidate.write_text(json.dumps({
-        "operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]
-    }))
+    candidate.write_text(
+        json.dumps(
+            {"operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]}
+        )
+    )
     review = app.preview(path, candidate)
     reviewed = review["candidate_hash"]
 
@@ -1053,20 +1137,33 @@ def test_candidate_apply_rejects_repository_change_during_test(repo, application
         def execute(self, command, snapshot):
             (path / "app.py").write_text("changed during test\n")
             return SandboxResult(
-                "PASS", 0, "EXITED", "1 passed", False, "d" * 64,
-                1.0, "b" * 64, "c" * 64,
+                "PASS",
+                0,
+                "EXITED",
+                "1 passed",
+                False,
+                "d" * 64,
+                1.0,
+                "b" * 64,
+                "c" * 64,
             )
 
     app.sandbox_factory = ChangingBackend
     with pytest.raises(DomainError) as changed:
-        app.apply_tested_candidate(path, candidate, reviewed,
-                                   review["source_snapshot_hash"], review["target_state_digest"],
-                                   "a" * 64,
-                                   ("tests/test_app.py",))
+        app.apply_tested_candidate(
+            path,
+            candidate,
+            reviewed,
+            review["source_snapshot_hash"],
+            review["target_state_digest"],
+            "a" * 64,
+            ("tests/test_app.py",),
+        )
     assert changed.value.code == ErrorCode.REPOSITORY_STATE_BLOCKED
     assert (path / "app.py").read_text() == "changed during test\n"
-    assert not WorktreeWriteJournal(app.db).pending(app.registry.lookup(
-        RepositoryIdentityResolver().resolve(path)))
+    assert not WorktreeWriteJournal(app.db).pending(
+        app.registry.lookup(RepositoryIdentityResolver().resolve(path))
+    )
 
 
 def test_candidate_apply_needs_current_apply_permission(repo, application, tmp_path):
@@ -1075,19 +1172,26 @@ def test_candidate_apply_needs_current_apply_permission(repo, application, tmp_p
     actor = app.identities.resolve()
     repository_id = app.registry.lookup(RepositoryIdentityResolver().resolve(path))
     candidate = tmp_path / "candidate.json"
-    candidate.write_text(json.dumps({
-        "operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]
-    }))
+    candidate.write_text(
+        json.dumps(
+            {"operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]}
+        )
+    )
     review = app.preview(path, candidate)
     reviewed = review["candidate_hash"]
     app.registry.permission(
         actor, actor.user_id, repository_id, Permission.PATCH_APPLY, grant=False
     )
     with pytest.raises(DomainError) as denied:
-        app.apply_tested_candidate(path, candidate, reviewed,
-                                   review["source_snapshot_hash"], review["target_state_digest"],
-                                   "a" * 64,
-                                   ("tests/test_app.py",))
+        app.apply_tested_candidate(
+            path,
+            candidate,
+            reviewed,
+            review["source_snapshot_hash"],
+            review["target_state_digest"],
+            "a" * 64,
+            ("tests/test_app.py",),
+        )
     assert denied.value.code == ErrorCode.ACCESS_DENIED
     assert (path / "app.py").read_text() == "def app():\n    return 1\n"
 
@@ -1096,16 +1200,23 @@ def test_candidate_apply_refuses_reviewed_base_after_new_commit(repo, applicatio
     path, git = repo
     app = application(path)
     candidate = tmp_path / "candidate.json"
-    candidate.write_text(json.dumps({
-        "operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]
-    }))
+    candidate.write_text(
+        json.dumps(
+            {"operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]}
+        )
+    )
     review = app.preview(path, candidate)
     (path / "app.py").write_text("def app():\n    return 3\n")
     git("commit", "-qam", "advance")
     with pytest.raises(DomainError) as stale:
         app.apply_tested_candidate(
-            path, candidate, review["candidate_hash"], review["source_snapshot_hash"],
-            review["target_state_digest"], "a" * 64, ("tests/test_app.py",)
+            path,
+            candidate,
+            review["candidate_hash"],
+            review["source_snapshot_hash"],
+            review["target_state_digest"],
+            "a" * 64,
+            ("tests/test_app.py",),
         )
     assert stale.value.code == ErrorCode.VERIFICATION_BASIS_MISMATCH
     assert (path / "app.py").read_text() == "def app():\n    return 3\n"
@@ -1117,9 +1228,11 @@ def test_candidate_apply_rechecks_permission_after_test(repo, application, tmp_p
     actor = app.identities.resolve()
     repository_id = app.registry.lookup(RepositoryIdentityResolver().resolve(path))
     candidate = tmp_path / "candidate.json"
-    candidate.write_text(json.dumps({
-        "operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]
-    }))
+    candidate.write_text(
+        json.dumps(
+            {"operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]}
+        )
+    )
     review = app.preview(path, candidate)
 
     class RevokingBackend:
@@ -1131,15 +1244,27 @@ def test_candidate_apply_rechecks_permission_after_test(repo, application, tmp_p
                 actor, actor.user_id, repository_id, Permission.PATCH_APPLY, grant=False
             )
             return SandboxResult(
-                "PASS", 0, "EXITED", "1 passed", False, "d" * 64,
-                1.0, "b" * 64, "c" * 64,
+                "PASS",
+                0,
+                "EXITED",
+                "1 passed",
+                False,
+                "d" * 64,
+                1.0,
+                "b" * 64,
+                "c" * 64,
             )
 
     app.sandbox_factory = RevokingBackend
     with pytest.raises(DomainError) as denied:
         app.apply_tested_candidate(
-            path, candidate, review["candidate_hash"], review["source_snapshot_hash"],
-            review["target_state_digest"], "a" * 64, ("tests/test_app.py",)
+            path,
+            candidate,
+            review["candidate_hash"],
+            review["source_snapshot_hash"],
+            review["target_state_digest"],
+            "a" * 64,
+            ("tests/test_app.py",),
         )
     assert denied.value.code == ErrorCode.ACCESS_DENIED
     assert (path / "app.py").read_text() == "def app():\n    return 1\n"
@@ -1151,9 +1276,11 @@ def test_candidate_apply_leaves_pending_if_repository_changes_after_rename(
     path, _ = repo
     app = application(path)
     candidate = tmp_path / "candidate.json"
-    candidate.write_text(json.dumps({
-        "operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]
-    }))
+    candidate.write_text(
+        json.dumps(
+            {"operations": [{"path": "app.py", "operation": "modify", "content": "x = 42\n"}]}
+        )
+    )
     review = app.preview(path, candidate)
 
     class PassingBackend:
@@ -1162,8 +1289,15 @@ def test_candidate_apply_leaves_pending_if_repository_changes_after_rename(
 
         def execute(self, command, snapshot):
             return SandboxResult(
-                "PASS", 0, "EXITED", "1 passed", False, "d" * 64,
-                1.0, "b" * 64, "c" * 64,
+                "PASS",
+                0,
+                "EXITED",
+                "1 passed",
+                False,
+                "d" * 64,
+                1.0,
+                "b" * 64,
+                "c" * 64,
             )
 
     app.sandbox_factory = PassingBackend
@@ -1176,8 +1310,13 @@ def test_candidate_apply_leaves_pending_if_repository_changes_after_rename(
     monkeypatch.setattr("kh_agent.patch.file_writer.os.replace", race_replace)
     with pytest.raises(DomainError) as changed:
         app.apply_tested_candidate(
-            path, candidate, review["candidate_hash"], review["source_snapshot_hash"],
-            review["target_state_digest"], "a" * 64, ("tests/test_app.py",)
+            path,
+            candidate,
+            review["candidate_hash"],
+            review["source_snapshot_hash"],
+            review["target_state_digest"],
+            "a" * 64,
+            ("tests/test_app.py",),
         )
     assert changed.value.code == ErrorCode.REPOSITORY_STATE_BLOCKED
     assert (path / "app.py").read_text() == "x = 42\n"

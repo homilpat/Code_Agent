@@ -19,7 +19,10 @@ from kh_agent.repository.snapshot import SourceScanner
 from kh_agent.sandbox.container import RootlessContainerBackend
 from kh_agent.sandbox.lsp import Location, LspSession, PythonLanguageClient
 from kh_agent.sandbox.policy import (
-    IMAGE_REFERENCE, LanguageServerRequest, PytestRequest, compile_language_server,
+    IMAGE_REFERENCE,
+    LanguageServerRequest,
+    PytestRequest,
+    compile_language_server,
     compile_pytest,
 )
 from kh_agent.store.database import Database
@@ -59,9 +62,7 @@ class Application:
         self.sandbox_factory = sandbox_factory or RootlessContainerBackend
         self.model_factory = model_factory or LocalModelClient
 
-    def semantic_query(
-        self, path: Path, target: str, line: int, column: int, image: str
-    ) -> dict:
+    def semantic_query(self, path: Path, target: str, line: int, column: int, image: str) -> dict:
         """Read-only bounded pyright evidence from an isolated source view."""
         identity = self.identities.resolve()
         repository = self.resolver.resolve(path)
@@ -110,31 +111,37 @@ class Application:
             except UnicodeDecodeError:
                 continue
 
-        def bounded_locations(
-            locations: tuple[Location, ...]
-        ) -> tuple[list[dict], bool, int]:
+        def bounded_locations(locations: tuple[Location, ...]) -> tuple[list[dict], bool, int]:
             visible = [item for item in locations if item.path in included]
-            return [
-                {"path": item.path, "line": item.start_line + 1,
-                 "column": item.start_character + 1}
-                for item in visible[:100]
-            ], len(visible) > 100, len(locations) - len(visible)
+            return (
+                [
+                    {
+                        "path": item.path,
+                        "line": item.start_line + 1,
+                        "column": item.start_character + 1,
+                    }
+                    for item in visible[:100]
+                ],
+                len(visible) > 100,
+                len(locations) - len(visible),
+            )
 
         found_definitions, definitions_truncated, definitions_outside = bounded_locations(
             definitions
         )
-        found_references, references_truncated, references_outside = bounded_locations(
-            references
-        )
+        found_references, references_truncated, references_outside = bounded_locations(references)
         return {
             "repository_id": repository_id,
             "status": "SANDBOXED_SEMANTIC_PARTIAL",
             "target": target,
             "source_snapshot_hash": snapshot.snapshot_hash,
             "source_completeness": snapshot.completeness,
-            "limitations": [*snapshot.limitations, "ONLY_INCLUDED_PYTHON_FILES",
-                            "REPOSITORY_PYRIGHT_CONFIG_NOT_LOADED",
-                            "THIRD_PARTY_DEPENDENCIES_NOT_MOUNTED"],
+            "limitations": [
+                *snapshot.limitations,
+                "ONLY_INCLUDED_PYTHON_FILES",
+                "REPOSITORY_PYRIGHT_CONFIG_NOT_LOADED",
+                "THIRD_PARTY_DEPENDENCIES_NOT_MOUNTED",
+            ],
             "workspace_ready": True,
             "definitions": found_definitions,
             "definitions_truncated": definitions_truncated,
@@ -143,8 +150,13 @@ class Application:
             "references_truncated": references_truncated,
             "references_outside_view": references_outside,
             "diagnostics": [
-                {"line": item.line + 1, "column": item.character + 1,
-                 "severity": item.severity, "code": item.code, "message": item.message}
+                {
+                    "line": item.line + 1,
+                    "column": item.character + 1,
+                    "severity": item.severity,
+                    "code": item.code,
+                    "message": item.message,
+                }
                 for item in diagnostics[:100]
             ],
             "diagnostics_truncated": len(diagnostics) > 100,
@@ -447,11 +459,9 @@ class Application:
             if self.resolver.resolve(path) != repository:
                 raise DomainError(ErrorCode.REPOSITORY_IDENTITY_CHANGED)
             actual = self.scanner.scan(repository)
-            if (
-                actual.exclusions != snapshot.exclusions
-                or [(item.path, item.content_hash) for item in actual.files]
-                != [(item.path, item.content_hash) for item in view.files]
-            ):
+            if actual.exclusions != snapshot.exclusions or [
+                (item.path, item.content_hash) for item in actual.files
+            ] != [(item.path, item.content_hash) for item in view.files]:
                 raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED, "Source changed after apply")
             changed = self.target_inspector(repository, repository_id)
             worktree = changed.evidence["worktree"]
@@ -477,7 +487,12 @@ class Application:
                 raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED, "Unexpected Git change")
 
         digest = journaled_replace_source_file(
-            journal, repository_id, identity.user_id, repository, source, replacement,
+            journal,
+            repository_id,
+            identity.user_id,
+            repository,
+            source,
+            replacement,
             source_snapshot_hash=snapshot.snapshot_hash,
             target_state_digest=baseline.state_digest,
             precommit=lambda: recheck("before apply"),

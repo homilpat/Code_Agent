@@ -307,8 +307,13 @@ def apply_candidate_command(
     _run(
         ctx,
         lambda db: _application(ctx, db).apply_tested_candidate(
-            repo, candidate_file, reviewed_hash, reviewed_source_hash,
-            reviewed_target_digest, image, tuple(test)
+            repo,
+            candidate_file,
+            reviewed_hash,
+            reviewed_source_hash,
+            reviewed_target_digest,
+            image,
+            tuple(test),
         ),
     )
 

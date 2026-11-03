@@ -308,12 +308,17 @@ def test_formal_revision_approval_binds_candidate_basis_target_and_actor(environ
         "key": "approve",
     }
     approved = env.patches.approve_revision(patch["patch_id"], 1, env.actor.user_id, **args)
-    assert approved == {"state": "APPROVED", "patch_hash": row["patch_hash"],
-                        "basis_hash": basis, "target_state_digest": "e" * 64}
+    assert approved == {
+        "state": "APPROVED",
+        "patch_hash": row["patch_hash"],
+        "basis_hash": basis,
+        "target_state_digest": "e" * 64,
+    }
     assert env.patches.approve_revision(patch["patch_id"], 1, env.actor.user_id, **args) == approved
     assert env.patches.check_integrity()["revisions_checked"] == 1
-    event = env.db.rows("SELECT payload_json,user_id FROM audit_events "
-                        "WHERE event_type='PATCH_APPROVED'")[0]
+    event = env.db.rows(
+        "SELECT payload_json,user_id FROM audit_events WHERE event_type='PATCH_APPROVED'"
+    )[0]
     assert json.loads(event["payload_json"])["target_state_digest"] == "e" * 64
     assert event["user_id"] == env.actor.user_id
     with env.db.transaction() as conn:
@@ -330,8 +335,11 @@ def test_approval_refuses_preview_or_wrong_basis_and_revoked_actor(environment):
     env = environment
     patch = proposal(env)
     row = env.db.rows("SELECT patch_hash FROM patch_revisions")[0]
-    args = {"expected_patch_hash": row["patch_hash"],
-            "expected_basis_hash": "a" * 64, "target_state_digest": "e" * 64}
+    args = {
+        "expected_patch_hash": row["patch_hash"],
+        "expected_basis_hash": "a" * 64,
+        "target_state_digest": "e" * 64,
+    }
     with pytest.raises(DomainError) as unverified:
         env.patches.approve_revision(patch["patch_id"], 1, env.actor.user_id, key="no", **args)
     assert unverified.value.code == ErrorCode.PATCH_NOT_VERIFIED
@@ -339,10 +347,15 @@ def test_approval_refuses_preview_or_wrong_basis_and_revoked_actor(environment):
         patch["patch_id"], 1, env.actor.user_id, succeeded=True, key="worktree"
     )
     env.patches.begin_verification(
-        patch["patch_id"], 1, env.actor.user_id,
-        readiness=VerificationReadiness(PatchState.APPLIED_TO_WORKTREE, True,
-                                        "ALLOW", "risk", "plan"),
-        final_diff_hash="c" * 64, plan={"test": True, "optional": False}, key="begin",
+        patch["patch_id"],
+        1,
+        env.actor.user_id,
+        readiness=VerificationReadiness(
+            PatchState.APPLIED_TO_WORKTREE, True, "ALLOW", "risk", "plan"
+        ),
+        final_diff_hash="c" * 64,
+        plan={"test": True, "optional": False},
+        key="begin",
     )
     finish(env, patch)
     with pytest.raises(DomainError) as mismatched:
@@ -374,9 +387,13 @@ def test_approval_event_failure_cannot_publish_approved_state(environment):
         )
     with pytest.raises(DomainError) as error:
         env.patches.approve_revision(
-            patch["patch_id"], 1, env.actor.user_id,
-            expected_patch_hash=row["patch_hash"], expected_basis_hash=basis,
-            target_state_digest="e" * 64, key="approve-error",
+            patch["patch_id"],
+            1,
+            env.actor.user_id,
+            expected_patch_hash=row["patch_hash"],
+            expected_basis_hash=basis,
+            target_state_digest="e" * 64,
+            key="approve-error",
         )
     assert error.value.code == ErrorCode.CRITICAL_PERSISTENCE_FAILED
     assert env.db.rows("SELECT lifecycle_state FROM patch_revisions")[0][0] == "VERIFIED"

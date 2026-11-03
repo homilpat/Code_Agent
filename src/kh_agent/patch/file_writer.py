@@ -50,7 +50,9 @@ def replace_source_file(
     try:
         decoded = path.decode("utf-8", "strict")
     except UnicodeDecodeError as exc:
-        raise DomainError(ErrorCode.INVALID_INPUT, "Only UTF-8 Python paths can be written") from exc
+        raise DomainError(
+            ErrorCode.INVALID_INPUT, "Only UTF-8 Python paths can be written"
+        ) from exc
     if (
         target_path(decoded) != path
         or not path.endswith(b".py")
@@ -95,7 +97,9 @@ def replace_source_file(
             with os.fdopen(fd, "rb") as stream:
                 opened = os.fstat(stream.fileno())
                 if _signature(opened) != _signature(before):
-                    raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED, "File changed before read")
+                    raise DomainError(
+                        ErrorCode.REPOSITORY_STATE_BLOCKED, "File changed before read"
+                    )
                 actual = stream.read(len(source.content) + 1)
                 after = os.fstat(stream.fileno())
             if (
@@ -109,8 +113,10 @@ def replace_source_file(
             precommit()
             temporary = b".kh-replacement-" + secrets.token_hex(16).encode("ascii")
             temp_fd = os.open(
-                temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                0o600, dir_fd=parent_fd,
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=parent_fd,
             )
             try:
                 with os.fdopen(temp_fd, "wb") as stream:
@@ -121,7 +127,9 @@ def replace_source_file(
                 if _signature(os.stat(name, dir_fd=parent_fd, follow_symlinks=False)) != _signature(
                     before
                 ):
-                    raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED, "File changed before rename")
+                    raise DomainError(
+                        ErrorCode.REPOSITORY_STATE_BLOCKED, "File changed before rename"
+                    )
                 root_now_fd = open_no_alias(
                     os.fsencode(repository.canonical_root),
                     os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
@@ -138,7 +146,8 @@ def replace_source_file(
                         os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
                         root_fd=root_fd,
                     )
-                    if parent_path else os.dup(root_fd)
+                    if parent_path
+                    else os.dup(root_fd)
                 )
                 try:
                     current = os.fstat(current_parent_fd)
@@ -158,6 +167,8 @@ def replace_source_file(
         finally:
             os.close(parent_fd)
     except OSError as exc:
-        raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED, "Worktree replacement failed") from exc
+        raise DomainError(
+            ErrorCode.REPOSITORY_STATE_BLOCKED, "Worktree replacement failed"
+        ) from exc
     finally:
         os.close(root_fd)

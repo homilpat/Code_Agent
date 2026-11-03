@@ -132,21 +132,33 @@ def test_semantic_command_service_reads_real_repository_in_podman(tmp_path, monk
     home = tmp_path / "git-home"
     home.mkdir()
     env = {
-        "PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(home),
-        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null",
-        "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@example.invalid",
-        "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.invalid",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "HOME": str(home),
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_AUTHOR_NAME": "test",
+        "GIT_AUTHOR_EMAIL": "test@example.invalid",
+        "GIT_COMMITTER_NAME": "test",
+        "GIT_COMMITTER_EMAIL": "test@example.invalid",
     }
-    for args in (("init", "-q", "-b", "main"), ("add", "app.py", "lib.py"),
-                 ("commit", "-q", "-m", "initial")):
-        subprocess.run([shutil.which("git") or "/usr/bin/git", "-C", str(repo), *args],
-                       env=env, check=True, capture_output=True)  # noqa: S603
+    for args in (
+        ("init", "-q", "-b", "main"),
+        ("add", "app.py", "lib.py"),
+        ("commit", "-q", "-m", "initial"),
+    ):
+        subprocess.run(
+            [shutil.which("git") or "/usr/bin/git", "-C", str(repo), *args],
+            env=env,
+            check=True,
+            capture_output=True,
+        )  # noqa: S603
     db = Database(tmp_path / "store" / "state.db")
     try:
         registry = Registry(db)
         actor = Identity(registry.bootstrap("linux-uid:1000"), "OS_MAPPING")
-        monkeypatch.setattr("kh_agent.identity.service.current_os_principal",
-                            lambda: "linux-uid:1000")
+        monkeypatch.setattr(
+            "kh_agent.identity.service.current_os_principal", lambda: "linux-uid:1000"
+        )
         registry.register(actor, RepositoryIdentityResolver().resolve(repo), "register")
         result = Application(db).semantic_query(repo, "app.py", 2, 10, str(IMAGE))
         assert result["status"] == "SANDBOXED_SEMANTIC_PARTIAL"

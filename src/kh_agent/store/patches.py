@@ -437,9 +437,7 @@ class PatchStore:
                 raise DomainError(ErrorCode.ACCESS_DENIED)
 
         # Check before idempotent replay too: a revoked user cannot retrieve an approval.
-        rows = self.db.rows(
-            "SELECT p.repository_id FROM patches p WHERE p.patch_id=?", (patch_id,)
-        )
+        rows = self.db.rows("SELECT p.repository_id FROM patches p WHERE p.patch_id=?", (patch_id,))
         if not rows:
             raise DomainError(ErrorCode.INVALID_INPUT, "Unknown patch")
         with self.db.transaction() as conn:
@@ -521,7 +519,8 @@ class PatchStore:
             ).fetchall()
             if not any(
                 event["user_id"] == user_id
-                and json.loads(event["payload_json"]) == {
+                and json.loads(event["payload_json"])
+                == {
                     "revision": revision,
                     "patch_hash": expected_patch_hash,
                     "basis_hash": expected_basis_hash,

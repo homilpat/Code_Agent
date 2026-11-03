@@ -14,8 +14,8 @@ from kh_agent.core.canonical import ContentHash, encode_path
 from kh_agent.core.enums import Permission
 from kh_agent.core.errors import DomainError, ErrorCode
 from kh_agent.core.ids import CommandRequestId
-from kh_agent.patch.file_writer import replace_source_file
 from kh_agent.patch.canonical import target_path
+from kh_agent.patch.file_writer import replace_source_file
 from kh_agent.repository.identity import RepositoryIdentity
 from kh_agent.repository.snapshot import SourceFile
 from kh_agent.security.ingestion import sensitive_content, sensitive_path
@@ -46,8 +46,12 @@ class WorktreeWriteJournal:
                 raise DomainError(ErrorCode.CRITICAL_PERSISTENCE_FAILED) from exc
             if event["event_type"] == "WORKTREE_WRITE_PREPARED":
                 required = {
-                    "attempt_id", "path_hash", "before_sha256", "after_sha256",
-                    "source_snapshot_hash", "target_state_digest",
+                    "attempt_id",
+                    "path_hash",
+                    "before_sha256",
+                    "after_sha256",
+                    "source_snapshot_hash",
+                    "target_state_digest",
                 }
                 proof = {"candidate_hash", "test_plan_hash", "test_attestation_digest"}
                 if attempt_id in seen or payload.keys() not in (required, required | proof):
@@ -72,8 +76,10 @@ class WorktreeWriteJournal:
                     attempt_id not in attempts
                     or payload.keys() != {"attempt_id", "after_sha256", "reason_code"}
                     or payload["reason_code"] not in ("ORIGINAL_BYTES", "REPLACEMENT_BYTES")
-                    or payload["after_sha256"] != attempts[attempt_id][
-                        "before_sha256" if payload["reason_code"] == "ORIGINAL_BYTES"
+                    or payload["after_sha256"]
+                    != attempts[attempt_id][
+                        "before_sha256"
+                        if payload["reason_code"] == "ORIGINAL_BYTES"
                         else "after_sha256"
                     ]
                 ):
@@ -104,7 +110,10 @@ class WorktreeWriteJournal:
         if any(value is None for value in proof) and any(value is not None for value in proof):
             raise DomainError(ErrorCode.INVALID_INPUT, "Incomplete test binding")
         for value in (
-            before_sha256, after_sha256, source_snapshot_hash, target_state_digest,
+            before_sha256,
+            after_sha256,
+            source_snapshot_hash,
+            target_state_digest,
             *(item for item in proof if item is not None),
         ):
             try:
@@ -135,11 +144,15 @@ class WorktreeWriteJournal:
                     "after_sha256": after_sha256,
                     "source_snapshot_hash": source_snapshot_hash,
                     "target_state_digest": target_state_digest,
-                    **({
-                        "candidate_hash": candidate_hash,
-                        "test_plan_hash": test_plan_hash,
-                        "test_attestation_digest": test_attestation_digest,
-                    } if candidate_hash is not None else {}),
+                    **(
+                        {
+                            "candidate_hash": candidate_hash,
+                            "test_plan_hash": test_plan_hash,
+                            "test_attestation_digest": test_attestation_digest,
+                        }
+                        if candidate_hash is not None
+                        else {}
+                    ),
                 },
             )
             return attempt_id
@@ -208,23 +221,37 @@ class WorktreeWriteJournal:
                         raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED)
                     data = stream.read(256 * 1024 + 1)
                     after = os.fstat(stream.fileno())
-                if (
-                    len(data) > 256 * 1024
-                    or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns,
-                        before.st_ctime_ns) !=
-                    (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns,
-                     after.st_ctime_ns)
+                if len(data) > 256 * 1024 or (
+                    before.st_dev,
+                    before.st_ino,
+                    before.st_size,
+                    before.st_mtime_ns,
+                    before.st_ctime_ns,
+                ) != (
+                    after.st_dev,
+                    after.st_ino,
+                    after.st_size,
+                    after.st_mtime_ns,
+                    after.st_ctime_ns,
                 ):
                     raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED)
                 current_fd = open_no_alias(path, os.O_RDONLY | os.O_NOFOLLOW, root_fd=root_fd)
                 try:
                     current = os.fstat(current_fd)
                     if (
-                        current.st_dev, current.st_ino, current.st_size,
-                        current.st_mtime_ns, current.st_ctime_ns, current.st_nlink,
+                        current.st_dev,
+                        current.st_ino,
+                        current.st_size,
+                        current.st_mtime_ns,
+                        current.st_ctime_ns,
+                        current.st_nlink,
                     ) != (
-                        after.st_dev, after.st_ino, after.st_size,
-                        after.st_mtime_ns, after.st_ctime_ns, after.st_nlink,
+                        after.st_dev,
+                        after.st_ino,
+                        after.st_size,
+                        after.st_mtime_ns,
+                        after.st_ctime_ns,
+                        after.st_nlink,
                     ):
                         raise DomainError(ErrorCode.REPOSITORY_STATE_BLOCKED)
                 finally:
