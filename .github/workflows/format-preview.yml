@@ -38,8 +38,13 @@ jobs:
               p = Path(name)
               if p.suffix != ".py":
                   continue
-              print("CODE_AGENT_FORMATTED_JSON:" + json.dumps(
-                  {"path": name, "content": p.read_text(encoding="utf-8")},
-                  ensure_ascii=True,
-              ))
+              content = p.read_text(encoding="utf-8")
+              size = 1800
+              total = max(1, (len(content) + size - 1) // size)
+              for index in range(total):
+                  print("CODE_AGENT_FORMATTED_CHUNK:" + json.dumps(
+                      {"path": name, "index": index, "total": total,
+                       "content": content[index * size:(index + 1) * size]},
+                      ensure_ascii=True,
+                  ))
           PY
