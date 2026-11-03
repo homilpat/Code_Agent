@@ -40,7 +40,9 @@ def test_mcp_delegates_to_existing_cli_and_acl(monkeypatch):
         )
 
     monkeypatch.setattr(subprocess, "run", fake_run)
-    result = execute_cli("explain", "/home/testuser/repo", store="/home/testuser/trusted", target="src/a.py")
+    result = execute_cli(
+        "explain", "/home/testuser/repo", store="/home/testuser/trusted", target="src/a.py"
+    )
     assert result == {"ok": True, "data": {"repository_id": "r1"}}
     assert captured["args"][1:5] == ["-m", "kh_agent", "--store", "/home/testuser/trusted"]
     assert captured["args"][-4:] == ["explain", "src/a.py", "--repo", "/home/testuser/repo"]
