@@ -72,4 +72,8 @@ Design requirement IDs in existing test markers are linked to the preserved hist
 
 ## License and provenance
 
-No new license is granted by this refactor. The complete pre-extraction implementation and removed web-service files remain accessible in Git history. Review the source and tests before running on valuable repositories.
+Copyright © 2026 JongHyeok Jang. Code Agent CLI is licensed under the **Apache License, Version 2.0**. See [LICENSE](LICENSE) and [NOTICE](NOTICE). You may use, modify, and distribute this project, including commercially, subject to the license's conditions (including retaining required copyright and license notices and indicating modified files). This does **not** require displaying the author's name inside an application's interface.
+
+For research use, **please cite Code Agent CLI** using [CITATION.cff](CITATION.cff). Academic citation is requested, not an additional legal condition of the Apache 2.0 license. Python dependencies and other third-party materials keep their own licenses; see their upstream notices.
+
+This new license is added to the **standalone CLI branch**. Earlier removed Knowledge Hub web-service files are retained in Git history and are **not automatically relicensed** by this change. Review the source and tests before running on valuable repositories.

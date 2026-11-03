@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use Code Agent CLI in academic work, please cite this repository."
+type: software
+title: "Code Agent CLI"
+abstract: "A local-first experimental coding agent with repository checks, access control, sandboxed verification, and evaluation tooling."
+authors:
+  - family-names: "Jang"
+    given-names: "JongHyeok"
+version: "0.1.0"
+date-released: "2026-11-04"
+repository-code: "https://github.com/homilpat/Code_Agent"
+license: "Apache-2.0"

@@ -1,0 +1,15 @@
+Code Agent CLI
+Copyright 2026 JongHyeok Jang
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file in this repository for the full license text.
+
+If you redistribute this product, retain applicable copyright notices, the
+Apache 2.0 license text, and this NOTICE file, and provide required notices
+of changes to modified files.
+
+Third-party libraries and other external materials remain subject to their
+respective licenses and notices. This notice does not claim ownership of them.
+
+The license in this standalone CLI branch does not, by itself, relicense
+removed Knowledge Hub application code preserved in earlier Git commits.

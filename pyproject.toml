@@ -7,6 +7,8 @@ name = "code-agent-cli"
 version = "0.1.0"
 description = "Standalone local-first coding agent with source-aware checks and sandboxed verification"
 readme = "README.md"
+license = "Apache-2.0"
+authors = [{ name = "JongHyeok Jang" }]
 requires-python = ">=3.11"
 dependencies = ["typer>=0.16,<1", "PyYAML>=6.0.2,<7"]
 
