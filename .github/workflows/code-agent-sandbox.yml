@@ -1,14 +1,26 @@
-name: Code Agent sandbox
+name: Code Agent CLI
 
 on:
   push:
     paths:
       - '.github/workflows/code-agent-sandbox.yml'
-      - 'code-agent/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'config/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'docs/ARCHITECTURE_DETAILED_DESIGN_v1.10.md'
   pull_request:
     paths:
       - '.github/workflows/code-agent-sandbox.yml'
-      - 'code-agent/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'config/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'docs/ARCHITECTURE_DETAILED_DESIGN_v1.10.md'
 
 permissions:
   contents: read
@@ -17,9 +29,6 @@ jobs:
   sandbox-integration:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: code-agent
     steps:
       - uses: actions/checkout@v6
         with:
@@ -46,10 +55,20 @@ jobs:
             -f config/sandbox/python-pyright.Containerfile config/sandbox
           podman image inspect localhost/kh-python-pytest:v1 >/dev/null
           podman image inspect localhost/kh-python-pyright:v1 >/dev/null
-      - name: Run real Podman and pyright integration tests
+      - name: CLI smoke
+        run: |
+          uv run code-agent --help
+          uv run code-agent doctor
+      - name: Real Podman and pyright integration tests
         env:
           KH_REQUIRE_SANDBOX_TESTS: '1'
         run: |
           uv run pytest -q tests/test_sandbox_container_linux.py tests/test_lsp_sandbox_linux.py
-      - name: Run remaining Code Agent tests
-        run: uv run pytest -q --ignore=tests/test_sandbox_container_linux.py --ignore=tests/test_lsp_sandbox_linux.py
+      - name: Other Code Agent tests and evaluation harness
+        run: |
+          uv run pytest -q --ignore=tests/test_sandbox_container_linux.py --ignore=tests/test_lsp_sandbox_linux.py
+          uv run python -m pytest -q evals/tests -p no:cacheprovider
+      - name: Ruff static checks and formatting
+        run: |
+          uv run ruff check .
+          uv run ruff format --check src tests evals
