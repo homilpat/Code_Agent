@@ -112,8 +112,7 @@ def create_server(*, store: str | None = None):
         from mcp.server import MCPServer
     except ImportError as exc:
         raise RuntimeError(
-            'MCP SDK missing: start with uv run --with "mcp>=2,<3" '
-            'python -m kh_agent.mcp_server'
+            'MCP SDK missing: start with uv run --with "mcp>=2,<3" python -m kh_agent.mcp_server'
         ) from exc
 
     server = MCPServer(

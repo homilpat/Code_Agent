@@ -25,7 +25,8 @@ def test_rejects_nonabsolute_or_control_character_paths(repo):
 @pytest.mark.parametrize("target", ["/etc/passwd", "--help", "a.py\nfoo", ""])
 def test_rejects_invalid_source_targets(target):
     assert execute_cli("explain", "/home/testuser/repo", target=target) == {
-        "ok": False, "error": "INVALID_ARGUMENT"
+        "ok": False,
+        "error": "INVALID_ARGUMENT",
     }
 
 
