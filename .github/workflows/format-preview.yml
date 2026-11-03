@@ -39,7 +39,7 @@ jobs:
               if p.suffix != ".py":
                   continue
               content = p.read_text(encoding="utf-8")
-              size = 1800
+              size = 600
               total = max(1, (len(content) + size - 1) // size)
               for index in range(total):
                   print("CODE_AGENT_FORMATTED_CHUNK:" + json.dumps(
