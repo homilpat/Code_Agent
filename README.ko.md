@@ -167,6 +167,17 @@ uv run python -m evals.runner run --model YOUR_LOCAL_MODEL_ID --attempts 3
 
 다음은 **현재 구현된 기능이 아닌 계획**입니다: 에이전트 보안 정책별 비교 실험, 평가 과제 확대, 작업 성공률과 보안 위반률의 정량 비교, 내부 `kh_agent` 패키지명 마이그레이션의 독립 검증.
 
+
+## MCP 연동 (로컬 stdio)
+
+기존 CLI 엔진을 **MCP를 지원하는 호스트 앱**에 연결할 수 있도록 별도의 stdio MCP 어댑터를 제공합니다. 저장소 상태, 감사 이력, Python 정적 분석, 영향 후보, 로컬 LLM 기반 **수정안 미리보기**를 도구로 노출합니다.
+
+```bash
+uv run --with 'mcp>=2,<3' python -m kh_agent.mcp_server
+```
+
+MCP SDK는 이 명령 실행 시에만 추가 설치되므로 기존 잠금 파일을 변경하지 않습니다. **Ollama·LM Studio에서 모델을 실행하는 것만으로 MCP 호스트가 되는 것은 아닙니다.** MCP 호환 에이전트·앱을 통해 연결해야 합니다. 임의 셸 명령 실행과 자동 코드 적용 도구는 제공하지 않습니다. [연동 안내](docs/MCP_INTEGRATION.md)를 참고하세요.
+
 ## 라이선스·연구 인용·저작권
 
 Copyright © 2026 **JongHyeok Jang**. 이 프로젝트는 **[Apache License 2.0](LICENSE)**을 따릅니다. 라이선스 조건에 따라 상업적 사용·수정·재배포가 가능하지만, 필요한 저작권·라이선스 고지를 보존하고 수정한 파일에는 변경 사실을 표시해야 합니다. [NOTICE](NOTICE)를 참고하세요. 외부 의존성에는 각자의 라이선스가 적용됩니다.

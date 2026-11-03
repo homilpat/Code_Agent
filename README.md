@@ -161,6 +161,17 @@ New installations use `~/.code-agent/db/code-agent.db`; if `~/.knowledge-hub` al
 
 Planned research directions—not current features—include clearer agent-policy experiments, more benchmark tasks, measurable security-versus-task-success trade-offs, and a separately tested migration of the internal `kh_agent` namespace.
 
+
+## MCP integration (local stdio)
+
+Code Agent can be attached to MCP-capable hosts without changing its core security model. A separate **stdio MCP adapter** exposes repository status, audit history, Python explanations, import impact candidates, and local-model **preview-only** proposals.
+
+```bash
+uv run --with 'mcp>=2,<3' python -m kh_agent.mcp_server
+```
+
+The optional MCP SDK is installed only for this invocation. The model backend remains local OpenAI-compatible HTTP; the **host must support MCP**, not merely load a local LLM. No arbitrary shell or automatic apply tool is exposed. See [MCP integration guide](docs/MCP_INTEGRATION.md).
+
 ## License, citation and provenance
 
 Copyright © 2026 **JongHyeok Jang**. Licensed under the **[Apache License 2.0](LICENSE)**. Keep applicable copyright/license notices and identify modified files when redistributing; see [NOTICE](NOTICE). Dependencies retain their own license obligations.
