@@ -1,0 +1,45 @@
+name: Temporary style candidate export
+
+on:
+  push:
+    paths:
+      - '.github/workflows/format-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  candidates:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install formatter
+        run: |
+          python -m pip install uv
+          uv sync --extra dev --locked
+      - name: Generate proposed formatting only (no remote writes)
+        run: |
+          uv run ruff check --fix . || true
+          uv run ruff format .
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          changed = subprocess.run(
+              ["git", "diff", "--name-only", "-z"],
+              check=True, capture_output=True,
+          ).stdout.decode().split("\0")
+          for name in sorted(set(changed) - {""}):
+              p = Path(name)
+              if p.suffix != ".py":
+                  continue
+              print("CODE_AGENT_FORMATTED_JSON:" + json.dumps(
+                  {"path": name, "content": p.read_text(encoding="utf-8")},
+                  ensure_ascii=True,
+              ))
+          PY
