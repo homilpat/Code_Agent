@@ -13,18 +13,18 @@ from kh_agent.mcp_server import _absolute_repo, _target_path, execute_cli
 def test_only_allowlisted_tools_are_callable(monkeypatch):
     invoked = Mock()
     monkeypatch.setattr(subprocess, "run", invoked)
-    assert execute_cli("apply", "/tmp/repo") == {"ok": False, "error": "UNSUPPORTED_TOOL"}
+    assert execute_cli("apply", "/home/testuser/repo") == {"ok": False, "error": "UNSUPPORTED_TOOL"}
     invoked.assert_not_called()
 
 
-@pytest.mark.parametrize("repo", ["relative/repo", "", "../repo", "/tmp/repo\nrun"])
+@pytest.mark.parametrize("repo", ["relative/repo", "", "../repo", "/home/testuser/repo\nrun"])
 def test_rejects_nonabsolute_or_control_character_paths(repo):
     assert execute_cli("status", repo) == {"ok": False, "error": "INVALID_ARGUMENT"}
 
 
 @pytest.mark.parametrize("target", ["/etc/passwd", "--help", "a.py\nfoo", ""])
 def test_rejects_invalid_source_targets(target):
-    assert execute_cli("explain", "/tmp/repo", target=target) == {
+    assert execute_cli("explain", "/home/testuser/repo", target=target) == {
         "ok": False, "error": "INVALID_ARGUMENT"
     }
 
@@ -35,13 +35,15 @@ def test_mcp_delegates_to_existing_cli_and_acl(monkeypatch):
     def fake_run(args, **kwargs):
         captured["args"] = args
         captured["kwargs"] = kwargs
-        return subprocess.CompletedProcess(args, 0, json.dumps({"repository_id": "r1"}).encode(), b"")
+        return subprocess.CompletedProcess(
+            args, 0, json.dumps({"repository_id": "r1"}).encode(), b""
+        )
 
     monkeypatch.setattr(subprocess, "run", fake_run)
-    result = execute_cli("explain", "/tmp/repo", store="/tmp/trusted", target="src/a.py")
+    result = execute_cli("explain", "/home/testuser/repo", store="/home/testuser/trusted", target="src/a.py")
     assert result == {"ok": True, "data": {"repository_id": "r1"}}
-    assert captured["args"][1:5] == ["-m", "kh_agent", "--store", "/tmp/trusted"]
-    assert captured["args"][-4:] == ["explain", "src/a.py", "--repo", "/tmp/repo"]
+    assert captured["args"][1:5] == ["-m", "kh_agent", "--store", "/home/testuser/trusted"]
+    assert captured["args"][-4:] == ["explain", "src/a.py", "--repo", "/home/testuser/repo"]
     assert captured["kwargs"]["capture_output"] is True
     assert "shell" not in captured["kwargs"]
 
@@ -54,7 +56,7 @@ def test_cli_access_denial_is_not_swallowed(monkeypatch):
             [], 3, b"", b'{"error":"ACCESS_DENIED","message":"Sensitive path"}'
         ),
     )
-    assert execute_cli("status", "/tmp/repo") == {"ok": False, "error": "ACCESS_DENIED"}
+    assert execute_cli("status", "/home/testuser/repo") == {"ok": False, "error": "ACCESS_DENIED"}
 
 
 def test_mcp_never_returns_raw_errors_or_secrets(monkeypatch):
@@ -65,7 +67,7 @@ def test_mcp_never_returns_raw_errors_or_secrets(monkeypatch):
             [], 1, b"", b"Sensitive token in subprocess stderr"
         ),
     )
-    assert execute_cli("history", "/tmp/repo") == {"ok": False, "error": "CLI_FAILED"}
+    assert execute_cli("history", "/home/testuser/repo") == {"ok": False, "error": "CLI_FAILED"}
 
 
 def test_mcp_modify_has_no_automatic_apply(monkeypatch):
@@ -77,7 +79,7 @@ def test_mcp_modify_has_no_automatic_apply(monkeypatch):
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     result = execute_cli(
-        "modify", "/tmp/repo", target="code.py", model="local-model", request="Fix bug"
+        "modify", "/home/testuser/repo", target="code.py", model="local-model", request="Fix bug"
     )
     assert result["ok"]
     assert captured["args"].count("modify") == 1
@@ -87,14 +89,14 @@ def test_mcp_modify_has_no_automatic_apply(monkeypatch):
 
 def test_model_port_and_input_limits():
     assert execute_cli(
-        "modify", "/tmp/repo", target="a.py", request="ok", model="model", port=0
+        "modify", "/home/testuser/repo", target="a.py", request="ok", model="model", port=0
     ) == {"ok": False, "error": "INVALID_ARGUMENT"}
     assert execute_cli(
-        "modify", "/tmp/repo", target="a.py", request="A" * 4001, model="model"
+        "modify", "/home/testuser/repo", target="a.py", request="A" * 4001, model="model"
     ) == {"ok": False, "error": "INVALID_ARGUMENT"}
 
 
 def test_backend_boundaries_not_replaced():
-    assert _absolute_repo("/tmp/example") == "/tmp/example"
+    assert _absolute_repo("/home/testuser/example") == "/home/testuser/example"
     assert _target_path("src/a.py") == "src/a.py"
-    assert Path("/tmp/example").is_absolute()
+    assert Path("/home/testuser/example").is_absolute()
