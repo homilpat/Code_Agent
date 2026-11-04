@@ -22,6 +22,10 @@ on:
       - 'uv.lock'
       - 'docs/ARCHITECTURE_DETAILED_DESIGN_v1.10.md'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
